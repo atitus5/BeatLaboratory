@@ -1,0 +1,6 @@
+# General
+*.DS_Store
+*.swp
+
+# Python-specific
+*.pyc
