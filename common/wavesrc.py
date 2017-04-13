@@ -74,4 +74,45 @@ class WaveBuffer(object):
 
 
 
+# simple class to hold a region: name, start frame, length (in frames)
+from collections import namedtuple
+AudioRegion = namedtuple('AudioRegion', ['name', 'start', 'len'])
 
+
+# a collection of regions read from a file
+class SongRegions(object):
+    def __init__(self, filepath):
+        super(SongRegions, self).__init__()
+
+        self.regions = []
+        self._read_regions(filepath)
+
+    def __repr__(self):
+        out = ''
+        for r in self.regions:
+            out = out + str(r) + '\n'
+        return out
+
+    def _read_regions(self, filepath) :
+        lines = open(filepath).readlines()
+
+        for line in lines:
+            # each region is: start_time val len name, separated by tabs.
+            # we don't care about val
+            # time values are in seconds
+            (start_sec, x, len_sec, name) = line.strip().split('\t')
+
+            # convert time (in seconds) to frames. Assumes Audio.sample_rate
+            start_f = int( float(start_sec) * Audio.sample_rate )
+            len_f = int( float(len_sec) * Audio.sample_rate )
+
+            self.regions.append(AudioRegion(name, start_f, len_f))
+
+# Reads from a regions file and a wave file to create a bunch of WaveBuffers,
+# one per region.
+def make_wave_buffers(regions_path, wave_path):
+    sr = SongRegions(regions_path)
+    buffers = {}
+    for r in sr.regions:
+        buffers[r.name] = WaveBuffer(wave_path, r.start, r.len)
+    return buffers

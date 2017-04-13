@@ -107,14 +107,26 @@ class Audio(object):
         try:
             config = ConfigParser()
             config.read(('../common/config.cfg', 'config.cfg'))
-            out_dev = config.getint('audio', 'outputdevice')
-            print 'using config file output device:', out_dev
-            in_dev = config.getint('audio', 'inputdevice')
-            print 'using config file input device:', in_dev
-            buf_size = config.getint('audio', 'buffersize')
-            print 'using config file buffer size:', buf_size
-            sample_rate = config.getint('audio', 'samplerate')
-            print 'using config file samplerate:', sample_rate
+
+            items = config.items('audio')
+
+            for opt in items:
+                if opt[0] == 'outputdevice':
+                    out_dev = int(opt[1])
+                    print 'using config file output device:', out_dev
+
+                elif opt[0] == 'inputdevice':
+                    in_dev = int(opt[1])
+                    print 'using config file input device:', in_dev
+
+                elif opt[0] == 'buffersize':
+                    buf_size = int(opt[1])
+                    print 'using config file buffer size:', buf_size
+
+                elif opt[0] == 'samplerate':
+                    sample_rate = int(opt[1])
+                    print 'using config file samplerate:', sample_rate
+
         except Exception, e:
             pass
 
