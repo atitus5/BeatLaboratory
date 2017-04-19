@@ -14,9 +14,11 @@ import core
 import time
 from ConfigParser import ConfigParser
 
+kSampleRate = 44100
+
 class Audio(object):
     # global variable: might change when Audio driver is set up.
-    sample_rate = 44100
+    sample_rate = kSampleRate
 
     def __init__(self, num_channels, listen_func = None, input_func = None):
         super(Audio, self).__init__()

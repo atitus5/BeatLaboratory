@@ -12,23 +12,25 @@ from common.wavegen import *
 from common.wavesrc import *
 from common.writer import *
 
-import numpy as np
+kNumChannels = 2
 
 class MainWidget(BaseWidget) :
     def __init__(self):
         super(MainWidget, self).__init__()
 
-        # Track mic input
-        self.mic = Audio(2, input_func=self.process_mic)
-        self.volume_circle = CEllipse(cpos=(Window.size[0] / 2, Window.size[0] / 2),
-                                      csize=(0, 0))
-        self.canvas.add(self.volume_circle)
+        # Set up audio input and output
+        self.writer = AudioWriter('data') # for debugging audio output
+        self.audio = Audio(kNumChannels, listen_func=self.writer.add_audio, input_func=self.process_mic_input)
 
-    def process_mic(self, data, num_channels):
-        volume_avg = sum(data) / float(len(data))
-        new_radius = volume_avg * Window.size[1] / 2.0
-        self.volume_circle.csize = (2 * new_radius, 2 * new_radius)
+        # Set up microphone input handling
+        self.mic_handler = MicrophoneHandler(kNumChannels)
 
+    def process_mic_input(self, data, num_channels):
+        # Send mic input to our handler
+        event = self.mic_handler.add_data(data)
+        if event is not None:
+            print event
+            # TODO: process event as input
 
     def on_key_down(self, keycode, modifiers):
         pass
@@ -37,7 +39,7 @@ class MainWidget(BaseWidget) :
         pass
 
     def on_update(self) :
-        self.mic.on_update()
+        self.audio.on_update()
 
 
 

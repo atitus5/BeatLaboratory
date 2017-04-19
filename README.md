@@ -7,4 +7,4 @@ test their skills by challenging them to focus on precise timing and
 complicated rhythms.
 
 To play:
-python blab.py
+./play.sh
