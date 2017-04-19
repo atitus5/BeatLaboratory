@@ -6,3 +6,5 @@ entertaining way. For more experienced beatboxers, the game is be a fun way to
 test their skills by challenging them to focus on precise timing and
 complicated rhythms.
 
+To play:
+python blab.py
