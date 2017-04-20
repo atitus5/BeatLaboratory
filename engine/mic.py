@@ -23,10 +23,10 @@ kBufferCount = int(math.ceil(kBufferSize / float(kBufferSpacing))) + 1
 kBufferFFTBins = 2 ** int(math.ceil(math.log(kBufferSize, 2)))
 
 # Experimentally determined constants
-kDCThreshold = 3.75
+kDCThreshold = 6.0
 kBassIndexThreshold = kBufferFFTBins / 64
-kTrebleBassRatio = 3.0
-kDebounceBackoff = 0.95  # Used to prevent multiple classifications in a row
+kTrebleBassRatio = 2.5
+kDebounceBackoff = 0.925  # Used to prevent multiple classifications in a row
 
 # Used to handle streaming audio input data and return events corresponding
 # to beatbox events
@@ -128,8 +128,11 @@ class MicrophoneHandler(object) :
             # Python arrays can use negative indices to wrap around end
             buf = buf_current - i - 1
             buf_idx = self.buffer_indices[buf]
-            self.buffers[buf][buf_idx:buf_idx + len(data)] = np.multiply(data,
-                                                                         self.window[buf_idx:buf_idx + len(data)])
-            self.buffer_indices[buf] += len(data)
+
+            # Fill as much as we can
+            data_len = min(len(data), kBufferSize - buf_idx)
+            self.buffers[buf][buf_idx:buf_idx + data_len] = np.multiply(data[:data_len],
+                                                                        self.window[buf_idx:buf_idx + data_len])
+            self.buffer_indices[buf] += data_len
 
         return completed_buffer
