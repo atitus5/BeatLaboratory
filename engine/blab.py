@@ -12,6 +12,8 @@ from common.wavegen import *
 from common.wavesrc import *
 from common.writer import *
 
+from mic import *
+
 kNumChannels = 2
 
 class MainWidget(BaseWidget) :
@@ -28,7 +30,7 @@ class MainWidget(BaseWidget) :
     def process_mic_input(self, data, num_channels):
         # Send mic input to our handler
         event = self.mic_handler.add_data(data)
-        if event is not None:
+        if len(event) > 0:
             print event
             # TODO: process event as input
 
