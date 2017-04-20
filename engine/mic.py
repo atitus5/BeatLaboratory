@@ -25,7 +25,7 @@ kBufferFFTBins = 2 ** int(math.ceil(math.log(kBufferSize, 2)))
 # Experimentally determined constants
 kDCThreshold = 6.0
 kBassIndexThreshold = kBufferFFTBins / 64
-kTrebleBassRatio = 2.5
+kTrebleBassRatio = 3.0
 kDebounceBackoff = 0.925  # Used to prevent multiple classifications in a row
 
 # Used to handle streaming audio input data and return events corresponding
