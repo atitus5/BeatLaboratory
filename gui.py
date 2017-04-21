@@ -1,4 +1,4 @@
-#pset7.py
+#gui.py
 
 # constants
 kLeftX = 20 # left screen padding
@@ -9,19 +9,20 @@ kTopY = 40 # top padding
 kNumGems = 8 # numbber of gems allowed per bar
 kNumPreviews = 1
 
-kGemSize = 60 # height of gem
+kGemWidth = 30
+kGemHeight = 60
 kThickness = 2 # thickness of bar
 kMeasureSpacing = 20 # vertical space between measures
 
-kWindowWidth = (kNumGems * kGemSize) + (2 * kThickness) + kLeftX + kRightX
-kWindowHeight = (kNumPreviews+1)*(kGemSize + 2*kThickness) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
+kWindowWidth = (kNumGems * kGemWidth) + (2 * kThickness) + kLeftX + kRightX
+kWindowHeight = (kNumPreviews+1)*(kGemHeight + 2*kThickness) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
 
 kSlopWindow = .20 # amount of time gem can be hit early/late
 kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of barline
 # could make kSnapFrac an argument in hypothetical future version
 
 import sys
-sys.path.append('..')
+#sys.path.append('..')
 
 from kivy.config import Config
 Config.set('graphics', 'width', str(kWindowWidth))
@@ -53,7 +54,7 @@ Color(0,0,1,mode='rgb'),
 Color(.5,0,.5,mode='rgb')
 ]
 
-song_path = '../data/IWannaBeSedated' # could make command argument in future
+song_path = './data/IWannaBeSedated' # could make command argument in future
 snapGems = True # Snap gems to fraction of a barline.
 seek = 0.0
 
@@ -250,6 +251,10 @@ class GemDisplay(InstructionGroup):
         self.add(self.color)
         self.add(self.gem)
 
+    # change the gem's position
+    def set_pos(self, pos):
+        self.gem.pos = pos
+
     # change to display this gem being hit
     def on_hit(self):
         self.color.rgba = (1,1,1,.5)
@@ -268,13 +273,21 @@ class BoxDisplay(InstructionGroup):
     def __init__(self, pos, size, thickness):
         super(BoxDisplay, self).__init__()
         self.add(Color(1,1,1,1, mode='rgba'))
-        self.add(Rectangle(pos=pos, size=size))
+        self.outer = Rectangle(pos=pos, size=size)
+        self.add(self.outer)
         self.add(Color(0,0,0,1, mode='rgba'))
         w = size[0] - 2*thickness
         h = size[1] - 2*thickness
         x = pos[0] + thickness
         y = pos[1] + thickness
-        self.add(Rectangle(pos=(x, y), size=(w,h)))
+        self.thickness = thickness
+        self.inner = Rectangle(pos=(x, y), size=(w,h))
+        self.add(self.inner)
+
+    # change the box's position
+    def set_pos(self, pos):
+        self.outer.pos = pos
+        self.inner.pos = [pos[0] + self.thickness, pos[1] + self.thickness]
 
 
 # a vertical line which can move linearly between two x positions
@@ -283,8 +296,12 @@ class NowbarDisplay(InstructionGroup):
         super(NowbarDisplay, self).__init__()
         self.color = Color(1,1,1,.85,mode='rgba')
         self.line = Line(points=(x_start, y0, x_start, y1))
+        self.trans = Translate(0,0)
+        self.trans_i = Translate(0,0)
+        self.add(self.trans)
         self.add(self.color)
         self.add(self.line)
+        self.add(self.trans_i)
         self.x_fn = linear(0, x_start, 1, x_end) # function to move line
 
     # progress is in [0, 1) and specifies fraction of bar completed
@@ -294,20 +311,26 @@ class NowbarDisplay(InstructionGroup):
         y1 = self.line.points[3]
         self.line.points = (newX, y0, newX, y1)
 
+    # translate the bar from its original specified points
+    def set_translate(self, xy):
+        self.trans.xy = xy
+        self.trans_i.xy = (-xy[0], -xy[1])
+
 
 # Displays one bar
 class MeasureDisplay(InstructionGroup):
     def __init__(self, pos, gems):
         super(MeasureDisplay, self).__init__()
-        w = kNumGems * kGemSize + 2*kThickness
-        h = kGemSize + 2*kThickness
-        self.add(BoxDisplay(pos=pos, size=(w, h), thickness=kThickness))
+        w = kNumGems * kGemWidth + 2*kThickness
+        h = kGemHeight + 2*kThickness
+        self.box = BoxDisplay(pos=pos, size=(w, h), thickness=kThickness)
+        self.add(self.box)
 
         self.gems = []
         for gem in gems:
-            x = pos[0] + kThickness + gem[0]*kGemSize
+            x = pos[0] + kThickness + gem[0]*kGemWidth
             y = pos[1] + kThickness
-            gd = GemDisplay(pos=(x,y), size=(kGemSize, kGemSize), beat=gem[1])
+            gd = GemDisplay(pos=(x,y), size=(kGemWidth, kGemHeight), beat=gem[1])
             self.gems.append(gd)
             self.add(gd)
 
@@ -321,6 +344,15 @@ class MeasureDisplay(InstructionGroup):
     # hit gem (gem_idx is relative to start of measure)
     def gem_hit(self, gem_idx):
         self.gems[gem_idx].on_hit()
+
+    def set_pos(self, pos):
+        xy = (pos[0] - self.box.outer.pos[0], pos[1] - self.box.outer.pos[1])
+        self.box.set_pos(pos)
+        self.nbd.set_translate(xy)
+        for gem in self.gems:
+            x = gem.gem.pos[0] + xy[0]
+            y = gem.gem.pos[1] + xy[1]
+            gem.set_pos((x,y))
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
@@ -358,21 +390,24 @@ class BeatMatchDisplay(InstructionGroup):
         if self.md:
             self.remove(self.md)
         for pd in self.previews:
-            self.remove(pd)
-        self.previews = []
-        y = kBottomY + kNumPreviews * (kGemSize + 2*kThickness + kMeasureSpacing)
-        self.md = MeasureDisplay(pos=(kLeftX, + 150), gems=self.bars[self.current_bar])
-        self.add(self.md)
-
-        for i in range(min(kNumPreviews, len(self.bars)-self.current_bar-1)):
-            y = kBottomY + (kNumPreviews - i - 1) * (kGemSize + 2*kThickness + kMeasureSpacing)
-            pd = MeasureDisplay(pos=(kLeftX,y), gems=self.bars[self.current_bar + 1])
+            x = pd.box.outer.pos[0]
+            y = pd.box.outer.pos[1] + (kGemHeight + 2*kThickness + kMeasureSpacing)
+            pd.set_pos((x, y))
+        if self.previews:
+            self.md = self.previews.pop(0)
+        else:
+            y = kBottomY + kNumPreviews * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            self.md = MeasureDisplay(pos=(kLeftX, y), gems=self.bars[self.current_bar])
+            self.add(self.md)
+        for i in range(min(kNumPreviews - len(self.previews), len(self.bars)-self.current_bar-1)):
+            y = kBottomY + (kNumPreviews - i - 1) * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            pd = MeasureDisplay(pos=(kLeftX,y), gems=self.bars[self.current_bar + i+1])
             self.previews.append(pd)
             self.add(pd)
 
     # called by Player. Causes the right thing to happen
     def gem_hit(self, gem_idx):
-        if gem_idx - self.gem_offset < len(self.bars[self.current_bar]):
+        if 0 < (gem_idx - self.gem_offset) < len(self.bars[self.current_bar]):
             self.md.gem_hit(gem_idx - self.gem_offset)
 
     # called by Player. Causes the right thing to happen
@@ -381,13 +416,17 @@ class BeatMatchDisplay(InstructionGroup):
 
     # call every frame to make gems and barlines flow down the screen
     def on_update(self, dt):
+        if self.current_bar >= len(self.bar_durations):
+            return
         self.bar_dur += dt
         if self.bar_dur >= self.bar_durations[self.current_bar]:
             self.bar_dur -= self.bar_durations[self.current_bar]
             self.gem_offset += len(self.bars[self.current_bar])
             self.current_bar += 1
             self.__update_display()
-        self.md.set_progress(self.bar_dur * self.bar_durations[self.current_bar]**-1)
+
+        progress = self.bar_dur * self.bar_durations[self.current_bar]**-1
+        self.md.set_progress(progress)
 
 
 # Handles game logic and keeps score.
