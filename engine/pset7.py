@@ -6,16 +6,15 @@ kRightX = kLeftX # right screen padding
 kBottomY = 40 # bottom padding
 kTopY = 40 # top padding
 
-kGemWidth = 60 # height of gem
-kGemHeight = kGemWidth # width of gem
 kNumGems = 8 # numbber of gems allowed per bar
+kNumPreviews = 1
 
-kBarThickness = 2 # thickness of bar
-kMeasureWidth = (kNumGems * kGemWidth) + (2 * kBarThickness)
-kMeasureHeight = kGemHeight + (2 * kBarThickness)
+kGemSize = 60 # height of gem
+kThickness = 2 # thickness of bar
+kMeasureSpacing = 20 # vertical space between measures
 
-kWindowWidth = kMeasureWidth + kLeftX + kRightX
-kWindowHeight = 300
+kWindowWidth = (kNumGems * kGemSize) + (2 * kThickness) + kLeftX + kRightX
+kWindowHeight = (kNumPreviews+1)*(kGemSize + 2*kThickness) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
 
 kSlopWindow = .20 # amount of time gem can be hit early/late
 kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of barline
@@ -240,13 +239,14 @@ class SongData(object):
         self.gems = sorted(list(set(self.gems)))
         self.barlines = sorted(list(set(self.barlines)))
 
-# display for a single gem at a position with a color (if desired)
+
+# displays a circle with a color depending on beat type
 class GemDisplay(InstructionGroup):
-    def __init__(self, pos, beat):
+    def __init__(self, pos, size, beat):
         super(GemDisplay, self).__init__()
         color = kColors[beat]
         self.color = Color(rgba=color.rgba)
-        self.gem = Ellipse(pos=pos, size=(kGemWidth, kGemHeight))
+        self.gem = Ellipse(pos=pos, size=size)
         self.add(self.color)
         self.add(self.gem)
 
@@ -263,42 +263,64 @@ class GemDisplay(InstructionGroup):
         pass
 
 
-# display for a single barline at a position
+# a rectangle border
+class BoxDisplay(InstructionGroup):
+    def __init__(self, pos, size, thickness):
+        super(BoxDisplay, self).__init__()
+        self.add(Color(1,1,1,1, mode='rgba'))
+        self.add(Rectangle(pos=pos, size=size))
+        self.add(Color(0,0,0,1, mode='rgba'))
+        w = size[0] - 2*thickness
+        h = size[1] - 2*thickness
+        x = pos[0] + thickness
+        y = pos[1] + thickness
+        self.add(Rectangle(pos=(x, y), size=(w,h)))
+
+
+# a vertical line which can move linearly between two x positions
 class NowbarDisplay(InstructionGroup):
-    def __init__(self):
+    def __init__(self, x_start, x_end, y0, y1):
         super(NowbarDisplay, self).__init__()
         self.color = Color(1,1,1,.85,mode='rgba')
-        x0 = kLeftX + kBarThickness
-        y1 = kBottomY + kBarThickness
-        y2 = y1 + kGemHeight
-        self.line = Line(points=(x0, y1, x0, y2))
+        self.line = Line(points=(x_start, y0, x_start, y1))
         self.add(self.color)
         self.add(self.line)
+        self.x_fn = linear(0, x_start, 1, x_end) # function to move line
 
-    # progress is in [0, 1) and specifies fraction of measure completed
+    # progress is in [0, 1) and specifies fraction of bar completed
     def set_progress(self, progress):
-        progress += (kNumGems*2)**-1
-        if progress > 1:
-            progress -= 1
-        x0 = kLeftX + kBarThickness
-        y1 = kBottomY + kBarThickness
-        y2 = y1 + kGemHeight
-        newX = np.round(kNumGems * kGemWidth * progress + x0)
-        self.line.points = (newX, y1, newX, y2)
+        newX = self.x_fn(progress)
+        y0 = self.line.points[1]
+        y1 = self.line.points[3]
+        self.line.points = (newX, y0, newX, y1)
 
 
 # Displays one bar
 class MeasureDisplay(InstructionGroup):
-    def __init__(self, pos):
+    def __init__(self, pos, gems):
         super(MeasureDisplay, self).__init__()
-        self.add(Color(1,1,1,1, mode='rgba'))
-        self.add(Rectangle(pos=pos, size=(kMeasureWidth, kMeasureHeight)))
-        self.add(Color(0,0,0,1, mode='rgba'))
-        w = kNumGems * kGemWidth
-        h = kGemHeight
-        x = pos[0]+kBarThickness
-        y = pos[1]+kBarThickness
-        self.add(Rectangle(pos=(x, y), size=(w,h)))
+        w = kNumGems * kGemSize + 2*kThickness
+        h = kGemSize + 2*kThickness
+        self.add(BoxDisplay(pos=pos, size=(w, h), thickness=kThickness))
+
+        self.gems = []
+        for gem in gems:
+            x = pos[0] + kThickness + gem[0]*kGemSize
+            y = pos[1] + kThickness
+            gd = GemDisplay(pos=(x,y), size=(kGemSize, kGemSize), beat=gem[1])
+            self.gems.append(gd)
+            self.add(gd)
+
+        self.nbd = NowbarDisplay(pos[0], pos[0]+w, pos[1], pos[1]+h)
+        self.add(self.nbd)
+
+    # move nowbar
+    def set_progress(self, progress):
+        self.nbd.set_progress(progress)
+
+    # hit gem (gem_idx is relative to start of measure)
+    def gem_hit(self, gem_idx):
+        self.gems[gem_idx].on_hit()
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
@@ -306,71 +328,66 @@ class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data):
         super(BeatMatchDisplay, self).__init__()
 
-        self.add(MeasureDisplay(pos=(kLeftX,kBottomY)))
-        self.nbd = NowbarDisplay()
-        self.add(self.nbd)
+        self.md = None
+        self.previews = []
 
-        self.sd_gems = song_data.gems
-        self.sd_bars = song_data.barlines
-        self.next_gem = 0
-        self.next_bar = 0
-        self.gems = []
-        self.active_gems = []
+        self.bars = []
+        self.bar_durations = []
+        i = 1
+        j = 0
+        while i < len(song_data.barlines):
+            bar = []
+            barlength = song_data.barlines[i] - song_data.barlines[i-1]
+            self.bar_durations.append(barlength)
+            while j < len(song_data.gems) and song_data.gems[j][0] < song_data.barlines[i]:
+                frac = (song_data.gems[j][0] - song_data.barlines[i-1])
+                new_idx = np.round(kNumGems * frac * barlength**-1)
+                bar.append((new_idx, song_data.gems[j][1]))
+                j += 1
+            self.bars.append(bar)
+            i += 1
+        self.current_bar = 0
+        self.gem_offset = 0
 
         temp_l = filter(lambda b: b < seek, song_data.barlines)
         self.bar_dur = self.now - max(temp_l) if temp_l else 0.0
 
-        self.__update_gems()
+        self.__update_display()
+
+    def __update_display(self):
+        if self.md:
+            self.remove(self.md)
+        for pd in self.previews:
+            self.remove(pd)
+        self.previews = []
+        y = kBottomY + kNumPreviews * (kGemSize + 2*kThickness + kMeasureSpacing)
+        self.md = MeasureDisplay(pos=(kLeftX, + 150), gems=self.bars[self.current_bar])
+        self.add(self.md)
+
+        for i in range(min(kNumPreviews, len(self.bars)-self.current_bar-1)):
+            y = kBottomY + (kNumPreviews - i - 1) * (kGemSize + 2*kThickness + kMeasureSpacing)
+            pd = MeasureDisplay(pos=(kLeftX,y), gems=self.bars[self.current_bar + 1])
+            self.previews.append(pd)
+            self.add(pd)
 
     # called by Player. Causes the right thing to happen
     def gem_hit(self, gem_idx):
-        self.gems[gem_idx].on_hit()
+        if gem_idx - self.gem_offset < len(self.bars[self.current_bar]):
+            self.md.gem_hit(gem_idx - self.gem_offset)
 
     # called by Player. Causes the right thing to happen
     def gem_pass(self, gem_idx):
-        self.gems[gem_idx].on_pass()
-
-    # called by Player. Causes the right thing to happen
-    def on_button_down(self, lane, hit):
         pass
-
-    # called by Player. Causes the right thing to happen
-    def on_button_up(self, lane):
-        pass
-
-    def __update_gems(self):
-        if self.next_bar + 1 >= len(self.sd_bars):
-            return
-
-        for gem in self.active_gems:
-            self.remove(gem)
-
-        for i in range(self.next_gem, len(self.sd_gems)):
-            gem = self.sd_gems[i]
-            if gem[0] >= self.sd_bars[self.next_bar + 1]:
-                break
-            barlength = self.sd_bars[self.next_bar+1] - self.sd_bars[self.next_bar]
-            frac = gem[0] - self.sd_bars[self.next_bar]
-            beat = np.round(kNumGems * frac * barlength**-1) % kNumGems
-            y = kBottomY + kBarThickness
-            x = kLeftX + kBarThickness + beat*kGemWidth
-            gd = GemDisplay(pos=(x,y), beat=gem[1])
-            self.gems.append(gd)
-            self.active_gems.append(gd)
-            self.add(gd)
-            self.next_gem += 1
-        if self.next_bar > 0:
-            self.bar_dur -= self.sd_bars[self.next_bar] - self.sd_bars[self.next_bar-1]
-        self.next_bar += 1
 
     # call every frame to make gems and barlines flow down the screen
     def on_update(self, dt):
         self.bar_dur += dt
-        barlength = self.sd_bars[self.next_bar] - self.sd_bars[self.next_bar-1]
-        progress = self.bar_dur * barlength**-1
-        if progress >= (kNumGems*2-1)*(kNumGems*2)**-1:
-            self.__update_gems()
-        self.nbd.set_progress(progress)
+        if self.bar_dur >= self.bar_durations[self.current_bar]:
+            self.bar_dur -= self.bar_durations[self.current_bar]
+            self.gem_offset += len(self.bars[self.current_bar])
+            self.current_bar += 1
+            self.__update_display()
+        self.md.set_progress(self.bar_dur * self.bar_durations[self.current_bar]**-1)
 
 
 # Handles game logic and keeps score.
@@ -395,7 +412,6 @@ class Player(object):
                 if abs(self.gem_data[i][0] - self.now) < kSlopWindow:
                     if self.gem_data[i][1] == lane:
                         self.display.gem_hit(i)
-                        self.display.on_button_down(lane, True)
                         self.next_gem += 1
                         self.streak += 1
                         self.score += 1 * min(4, 1 + self.streak/5)
@@ -412,14 +428,13 @@ class Player(object):
         # else temporal miss
 
         # on miss
-        self.display.on_button_down(lane, False)
         self.streak = 0
         self.mute = True
 
 
     # called by MainWidget
     def on_button_up(self, lane):
-        self.display.on_button_up(lane)
+        pass
 
     # needed to check if for pass gems (ie, went past the slop window)
     def on_update(self, dt):
