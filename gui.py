@@ -99,6 +99,7 @@ def botmid_label() :
         )
     return l
 
+
 class MainWidget(BaseWidget) :
     def __init__(self):
         super(MainWidget, self).__init__()
@@ -139,12 +140,6 @@ class MainWidget(BaseWidget) :
         button_idx = lookup(keycode[1], '12345', (0,1,2,3,4))
         if button_idx != None:
             self.player.on_button_down(button_idx)
-
-    def on_key_up(self, keycode):
-        # button up
-        button_idx = lookup(keycode[1], '12345', (0,1,2,3,4))
-        if button_idx != None:
-            self.player.on_button_up(button_idx)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now
@@ -258,14 +253,6 @@ class GemDisplay(InstructionGroup):
     # change to display this gem being hit
     def on_hit(self):
         self.color.rgba = (1,1,1,.5)
-
-    # change to display a passed gem
-    def on_pass(self):
-        pass
-
-    # useful if gem is to animate
-    def on_update(self, dt):
-        pass
 
 
 # a rectangle border
@@ -424,10 +411,6 @@ class BeatMatchDisplay(InstructionGroup):
         else:
             self.bars[self.current_bar+1].gem_hit(gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar]))
 
-    # called by Player. Causes the right thing to happen
-    def gem_pass(self, gem_idx):
-        pass
-
     # call every frame to make gems and barlines flow down the screen
     def on_update(self, dt):
         if self.current_bar >= len(self.bar_durations):
@@ -473,7 +456,6 @@ class Player(object):
 
             # check for lane miss
             if abs(self.gem_data[self.next_gem][0] - self.now) < kSlopWindow:   
-                    self.display.gem_pass(self.next_gem)
                     self.next_gem += 1
 
         # else temporal miss
@@ -482,17 +464,11 @@ class Player(object):
         self.streak = 0
         self.mute = True
 
-
-    # called by MainWidget
-    def on_button_up(self, lane):
-        pass
-
     # needed to check if for pass gems (ie, went past the slop window)
     def on_update(self, dt):
         self.now += dt
         # check for temporal miss
         while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
-            self.display.gem_pass(self.next_gem)
             self.next_gem += 1
             self.streak = 0
             self.mute = True
