@@ -9,7 +9,7 @@ kTopY = 40 # top padding
 kNumGems = 8 # numbber of gems allowed per bar
 kNumPreviews = 1
 
-kGemWidth = 30
+kGemWidth = 60
 kGemHeight = 60
 kThickness = 2 # thickness of bar
 kMeasureSpacing = 20 # vertical space between measures
@@ -318,6 +318,10 @@ class NowbarDisplay(InstructionGroup):
 
 
 # Displays one bar
+# pos is iterable (x, y)
+# gems is iterable ((beat_num, beat_type), ...)
+#   where 0 <= beat_num < kNumBeats specifies position
+#   and beat_type specifies type of hit needed
 class MeasureDisplay(InstructionGroup):
     def __init__(self, pos, gems):
         super(MeasureDisplay, self).__init__()
@@ -360,11 +364,10 @@ class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data):
         super(BeatMatchDisplay, self).__init__()
 
-        self.md = None
-        self.previews = []
-
+        # process song data to pre-generate bar graphics
         self.bars = []
         self.bar_durations = []
+        self.bar_num_gems = []
         i = 1
         j = 0
         while i < len(song_data.barlines):
@@ -376,39 +379,50 @@ class BeatMatchDisplay(InstructionGroup):
                 new_idx = np.round(kNumGems * frac * barlength**-1)
                 bar.append((new_idx, song_data.gems[j][1]))
                 j += 1
-            self.bars.append(bar)
+            self.bar_num_gems.append(len(bar))
+            self.bars.append(MeasureDisplay(pos=(kLeftX, kBottomY), gems=bar))
             i += 1
+
+        # current bar (probably 0 unless seek is set)
         self.current_bar = 0
+        while self.current_bar < len(self.bars) and seek > song_data.barlines[self.current_bar + 1]:
+            self.current_bar += 1
+
         self.gem_offset = 0
 
+        # time into bar (probably 0s unless seek is set)
         temp_l = filter(lambda b: b < seek, song_data.barlines)
         self.bar_dur = self.now - max(temp_l) if temp_l else 0.0
 
-        self.__update_display()
+        # show intial graphics
+        for i in range(min(kNumPreviews + 1, len(self.bars) - self.current_bar - 1)):
+            y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            self.bars[self.current_bar + i].set_pos((kLeftX, y))
+            self.add(self.bars[self.current_bar + i])
 
     def __update_display(self):
-        if self.md:
-            self.remove(self.md)
-        for pd in self.previews:
-            x = pd.box.outer.pos[0]
-            y = pd.box.outer.pos[1] + (kGemHeight + 2*kThickness + kMeasureSpacing)
-            pd.set_pos((x, y))
-        if self.previews:
-            self.md = self.previews.pop(0)
-        else:
-            y = kBottomY + kNumPreviews * (kGemHeight + 2*kThickness + kMeasureSpacing)
-            self.md = MeasureDisplay(pos=(kLeftX, y), gems=self.bars[self.current_bar])
-            self.add(self.md)
-        for i in range(min(kNumPreviews - len(self.previews), len(self.bars)-self.current_bar-1)):
-            y = kBottomY + (kNumPreviews - i - 1) * (kGemHeight + 2*kThickness + kMeasureSpacing)
-            pd = MeasureDisplay(pos=(kLeftX,y), gems=self.bars[self.current_bar + i+1])
-            self.previews.append(pd)
-            self.add(pd)
+        # remove finished measure
+        self.remove(self.bars[self.current_bar])
+        # update current measure
+        self.gem_offset += self.bar_num_gems[self.current_bar]
+        self.current_bar += 1
+        # move preview measures up
+        for i in range(min(kNumPreviews, len(self.bars) - self.current_bar - 1)):
+            y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            self.bars[self.current_bar + i].set_pos((kLeftX, y))
+        # add new preview measure
+        if self.current_bar + kNumPreviews < len(self.bars):
+            self.add(self.bars[self.current_bar + kNumPreviews])
 
     # called by Player. Causes the right thing to happen
     def gem_hit(self, gem_idx):
-        if 0 < (gem_idx - self.gem_offset) < len(self.bars[self.current_bar]):
-            self.md.gem_hit(gem_idx - self.gem_offset)
+        # this logic assumes gem hit will never be given more than +/- 1 bar early/late
+        if 0 <= (gem_idx - self.gem_offset) < self.bar_num_gems[self.current_bar]:
+            self.bars[self.current_bar].gem_hit(gem_idx - self.gem_offset)
+        elif (gem_idx - self.gem_offset) < 0:
+            self.bars[self.current_bar-1].gem_hit(gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1]))
+        else:
+            self.bars[self.current_bar+1].gem_hit(gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar]))
 
     # called by Player. Causes the right thing to happen
     def gem_pass(self, gem_idx):
@@ -421,12 +435,10 @@ class BeatMatchDisplay(InstructionGroup):
         self.bar_dur += dt
         if self.bar_dur >= self.bar_durations[self.current_bar]:
             self.bar_dur -= self.bar_durations[self.current_bar]
-            self.gem_offset += len(self.bars[self.current_bar])
-            self.current_bar += 1
             self.__update_display()
 
         progress = self.bar_dur * self.bar_durations[self.current_bar]**-1
-        self.md.set_progress(progress)
+        self.bars[self.current_bar].set_progress(progress)
 
 
 # Handles game logic and keeps score.
