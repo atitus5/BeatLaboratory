@@ -17,7 +17,7 @@ from common.audio import *
 # and one is "free" for overflow when a buffer fills. The "real-time"
 # buffer is updated with the newest data while the delayed buffers
 # are updated with delayed data. The "real-time" buffer rotates regularly.
-kBufferSize = int(kSampleRate * 0.025)      # 25 ms
+kBufferSize = int(kSampleRate * 0.100)      # 25 ms
 kBufferSpacing = int(kSampleRate * 0.010)   # 10 ms
 kBufferCount = int(math.ceil(kBufferSize / float(kBufferSpacing))) + 1
 kBufferFFTBins = 2 ** int(math.ceil(math.log(kBufferSize, 2)))
@@ -107,16 +107,14 @@ class MicrophoneHandler(object) :
         buffer_full = (kBufferSize - buf_idx) < len(data)
         if buffer_full:
             # Fill as much as we can, then reset its index
-            self.buffers[buf_current][buf_idx:] = np.multiply(data[:kBufferSize - buf_idx],
-                                                              self.window[buf_idx:])
+            self.buffers[buf_current][buf_idx:] = np.multiply(data[:kBufferSize - buf_idx], self.window[buf_idx:])
             self.buffer_indices[buf_current] = 0
             completed_buffer = True
 
             # Fill up free one with tail of data
             overlap = len(data) - (kBufferSize - buf_idx)
             free_idx = buf_current - (kBufferCount - 1)
-            self.buffers[free_idx][0:overlap] = np.multiply(data[kBufferSize - buf_idx:],
-                                                            self.window[:overlap])
+            self.buffers[free_idx][0:overlap] = np.multiply(data[kBufferSize - buf_idx:], self.window[:overlap])
             self.buffer_indices[free_idx] = overlap
         else:
             self.buffers[buf_current][buf_idx:buf_idx + len(data)] = data
@@ -131,8 +129,7 @@ class MicrophoneHandler(object) :
 
             # Fill as much as we can
             data_len = min(len(data), kBufferSize - buf_idx)
-            self.buffers[buf][buf_idx:buf_idx + data_len] = np.multiply(data[:data_len],
-                                                                        self.window[buf_idx:buf_idx + data_len])
+            self.buffers[buf][buf_idx:buf_idx + data_len] = np.multiply(data[:data_len], self.window[buf_idx:buf_idx + data_len])
             self.buffer_indices[buf] += data_len
 
         return completed_buffer

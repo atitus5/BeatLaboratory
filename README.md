@@ -8,3 +8,7 @@ complicated rhythms.
 
 To play:
 ./play.sh
+
+
+Image Credit
+kick, snare: Artem Kovyazin
