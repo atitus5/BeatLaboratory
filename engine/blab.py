@@ -23,7 +23,8 @@ kNumGems = 8 # numbber of gems allowed per bar
 kNumPreviews = 1 # number of measures ahead shown
 
 # gameplay only
-kSlopWindow = .20 # amount of time gem can be hit early/late
+# kSlopWindow = .20 # amount of time gem can be hit early/late
+kSlopWindow = .30 # amount of time gem can be hit early/late (more generous for mic)
 kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of barline
 
 # these are just convenient
@@ -72,7 +73,8 @@ from mic import *
 
 
 # ARGUMENTS
-song_path = '../data/IWannaBeSedated' # could make command argument in future
+# song_path = '../data/IWannaBeSedated' # could make command argument in future
+song_path = '../data/BeatItNoDrums' # could make command argument in future
 snapGems = True # snap gems to fraction of a barline.
 seek = 0.0 # start x seconds into song (pass in via command line)
 
@@ -159,28 +161,31 @@ class AudioController(object):
         super(AudioController, self).__init__()
 
         self.bg = WaveGenerator(WaveFile(song_path + '_bg.wav'))
-        self.solo = WaveGenerator(WaveFile(song_path + '_solo.wav'))
+        # self.solo = WaveGenerator(WaveFile(song_path + '_solo.wav'))
 
         self.bg.pause()
-        self.solo.pause()
+        # self.solo.pause()
 
         self.bg.frame = int(seek * Audio.sample_rate)
-        self.solo.frame = int(seek * Audio.sample_rate)
+        # self.solo.frame = int(seek * Audio.sample_rate)
 
         mixer.add(self.bg)
-        mixer.add(self.solo)
+        # mixer.add(self.solo)
 
     # start / stop the song
     def toggle(self):
         self.bg.play_toggle()
-        self.solo.play_toggle()
+        # self.solo.play_toggle()
 
     # mute / unmute the solo track
     def set_mute(self, mute):
+        pass    # No solo track for B-Lab, yo
+        '''
         if mute:
             self.solo.set_gain(0.0)
         else:
             self.solo.set_gain(1.0)
+        '''
 
 
 # PARSE DATA (gems & barlines)
