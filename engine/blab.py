@@ -85,12 +85,13 @@ class MainWidget(BaseWidget) :
         super(MainWidget, self).__init__()
         # Set up audio input and output
         self.writer = AudioWriter('data') # for debugging audio output
-        self.audio = Audio(kNumChannels, listen_func=self.writer.add_audio, input_func=self.process_mic_input)
+        self.music_audio = MusicAudio(kNumChannels, listen_func=self.writer.add_audio)
+        self.mic_audio = MicAudio(kNumChannels, input_func=self.process_mic_input)
 
         # game audio output
         self.mixer = Mixer()
-        self.audio.set_generator(self.mixer)
-        self.audio_ctrl = AudioController(song_path, self.mixer)
+        self.music_audio.set_generator(self.mixer)
+        self.music_audio_ctrl = AudioController(song_path, self.mixer)
         self.song_data = SongData()
         self.song_data.read_data(song_path+'_gems.txt', song_path+'_barlines.txt')
 
@@ -118,13 +119,13 @@ class MainWidget(BaseWidget) :
         self.clock.set_time(seek)
 
         # gameplay
-        self.player = Player(self.song_data.gems, self.bmd, self.audio_ctrl)
+        self.player = Player(self.song_data.gems, self.bmd, self.music_audio_ctrl)
 
     def on_key_down(self, keycode, modifiers):
         # play / pause toggle
         if keycode[1] == 'p':
             self.clock.toggle()
-            self.audio_ctrl.toggle()
+            self.music_audio_ctrl.toggle()
 
         # button down
         button_idx = lookup(keycode[1], '12', (0,1))
@@ -145,7 +146,8 @@ class MainWidget(BaseWidget) :
         dt = self.clock.get_time() - self.now
         self.now += dt
         self.player.on_update(dt)
-        self.audio.on_update()
+        self.music_audio.on_update()
+        self.mic_audio.on_update()
         self.score_label.text = 'score: ' + str(self.player.get_score())
         self.streak_label.text = str(self.player.get_streak()) + ' in a row'
         self.multiplier_label.text = 'x' + str(self.player.get_multiplier())
@@ -490,7 +492,7 @@ class Player(object):
         super(Player, self).__init__()
         self.gem_data = gem_data
         self.display = display
-        self.audio_ctrl = audio_ctrl
+        self.music_audio_ctrl = audio_ctrl
         self.next_gem = 0
         self.now = seek
         self.score = 0
@@ -531,7 +533,7 @@ class Player(object):
             self.next_gem += 1
             self.streak = 0
             self.mute = True
-        self.audio_ctrl.set_mute(self.mute)
+        self.music_audio_ctrl.set_mute(self.mute)
         self.display.on_update(dt)
 
     def get_score(self):

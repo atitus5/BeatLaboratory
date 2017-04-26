@@ -147,6 +147,116 @@ class Audio(object):
 
         return out_dev, in_dev, buf_size, sample_rate
 
+class MusicAudio(Audio):
+    def __init__(self, num_channels, listen_func = None, input_func = None):
+        super(MusicAudio, self).__init__(num_channels, listen_func, input_func)
+
+    # return parameter values for output device idx, input device idx, and
+    # buffer size. Specific to music for audio config file
+    def _get_parameters(self):
+        # default values
+        out_dev = None
+        in_dev = None
+        buf_size = 512
+        sample_rate = None
+
+        # First, try loading config params from configuration file.
+        try:
+            config = ConfigParser()
+            config.read(('../common/music_config.cfg', 'music_config.cfg'))
+
+            items = config.items('music_audio')
+
+            for opt in items:
+                if opt[0] == 'outputdevice':
+                    out_dev = int(opt[1])
+                    print 'music using config file output device:', out_dev
+
+                elif opt[0] == 'inputdevice':
+                    in_dev = int(opt[1])
+                    print 'music using config file input device:', in_dev
+
+                elif opt[0] == 'buffersize':
+                    buf_size = int(opt[1])
+                    print 'music using config file buffer size:', buf_size
+
+                elif opt[0] == 'samplerate':
+                    sample_rate = int(opt[1])
+                    print 'music using config file samplerate:', sample_rate
+
+        except Exception, e:
+            pass
+
+        # for Windows, we want to find the ASIO host API and associated devices
+        if out_dev == None:
+            cnt = self.audio.get_host_api_count()
+            for i in range(cnt):
+                api = self.audio.get_host_api_info_by_index(i)
+                if api['type'] == pyaudio.paASIO:
+                    host_api_idx = i
+                    out_dev = api['defaultOutputDevice']
+                    in_dev = api['defaultInputDevice']
+                    print 'Found ASIO host', host_api_idx
+                    print '  using output device', out_dev
+                    print '  using input device', in_dev
+
+        return out_dev, in_dev, buf_size, sample_rate
+
+class MicAudio(Audio):
+    def __init__(self, num_channels, listen_func = None, input_func = None):
+        super(MicAudio, self).__init__(num_channels, listen_func, input_func)
+
+    # return parameter values for output device idx, input device idx, and
+    # buffer size. Specific to mic for audio config file
+    def _get_parameters(self):
+        # default values
+        out_dev = None
+        in_dev = None
+        buf_size = 512
+        sample_rate = None
+
+        # First, try loading config params from configuration file.
+        try:
+            config = ConfigParser()
+            config.read(('../common/mic_config.cfg', 'mic_config.cfg'))
+
+            items = config.items('mic_audio')
+
+            for opt in items:
+                if opt[0] == 'outputdevice':
+                    out_dev = int(opt[1])
+                    print 'mic using config file output device:', out_dev
+
+                elif opt[0] == 'inputdevice':
+                    in_dev = int(opt[1])
+                    print 'mic using config file input device:', in_dev
+
+                elif opt[0] == 'buffersize':
+                    buf_size = int(opt[1])
+                    print 'mic using config file buffer size:', buf_size
+
+                elif opt[0] == 'samplerate':
+                    sample_rate = int(opt[1])
+                    print 'mic using config file samplerate:', sample_rate
+
+        except Exception, e:
+            pass
+
+        # for Windows, we want to find the ASIO host API and associated devices
+        if out_dev == None:
+            cnt = self.audio.get_host_api_count()
+            for i in range(cnt):
+                api = self.audio.get_host_api_info_by_index(i)
+                if api['type'] == pyaudio.paASIO:
+                    host_api_idx = i
+                    out_dev = api['defaultOutputDevice']
+                    in_dev = api['defaultInputDevice']
+                    print 'Found ASIO host', host_api_idx
+                    print '  using output device', out_dev
+                    print '  using input device', in_dev
+
+        return out_dev, in_dev, buf_size, sample_rate
+
 def print_audio_devices():
     audio = pyaudio.PyAudio()
     cnt = audio.get_host_api_count()
