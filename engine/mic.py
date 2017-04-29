@@ -28,6 +28,9 @@ kBassIndexThreshold = kBufferFFTBins / 64
 kTrebleBassRatio = 3.0
 kDebounceBackoff = 0.925  # Used to prevent multiple classifications in a row
 
+
+from extract import *
+
 # Used to handle streaming audio input data and return events corresponding
 # to beatbox events
 # NOTE: currently only accepts stereo audio (i.e. num_channels = 2)
@@ -51,6 +54,9 @@ class MicrophoneHandler(object) :
         # Track last time we classified, so we can debounce the signal
         self.last_classified = 1024     # Arbitrarily high number so that we start off with no debouncing
 
+        # Set up our manager for extracting features from audio buffers for classification
+        self.feature_extractor = FeatureExtractor(num_channels)
+
     # Receive data and send back a string indicating the event that occurred.
     # Returns empty string if no event occurred
     def add_data(self, data):
@@ -59,7 +65,12 @@ class MicrophoneHandler(object) :
 
         if buffer_filled:
             # Figure out what event just occurred!
-            event = self._classify_event(self.buffers[self.current_buffer])
+            # event = self._classify_event(self.buffers[self.current_buffer])
+
+            # Extract events
+            # TODO: get this actually working
+            features = self.feature_extractor.extract_mfccs(self.buffers[self.current_buffer])
+            print features
 
             # Move to next active buffer. Don't worry about clearing buffer,
             # as it will be fully overwritten before being used again
