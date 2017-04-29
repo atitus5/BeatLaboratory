@@ -1,6 +1,7 @@
 #extract.py
 
 import numpy as np
+import scipy as sp
 from ctypes import *
 
 from mic import *
@@ -18,6 +19,8 @@ class FeatureExtractor(object) :
 
         # Set up function pointer
         self.mfcc_extractor = cdll.LoadLibrary("mfcc.so")
+
+        # 
 
         # Set up a persistant buffer for MFCCs so we don't waste memory!
         self.mfcc_buffer = np.zeros(kNumMFCCs, dtype=np.float64)
