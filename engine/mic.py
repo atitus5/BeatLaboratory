@@ -20,16 +20,9 @@ from common.audio import *
 kBufferSize = int(kSampleRate * 0.100)      # 25 ms
 kBufferSpacing = int(kSampleRate * 0.010)   # 10 ms
 kBufferCount = int(math.ceil(kBufferSize / float(kBufferSpacing))) + 1
-kBufferFFTBins = 2 ** int(math.ceil(math.log(kBufferSize, 2)))
-
-# Experimentally determined constants
-kDCThreshold = 6.0
-kBassIndexThreshold = kBufferFFTBins / 64
-kTrebleBassRatio = 3.0
-kDebounceBackoff = 0.925  # Used to prevent multiple classifications in a row
-
 
 from extract import *
+from classifier import *
 
 # Used to handle streaming audio input data and return events corresponding
 # to beatbox events
@@ -51,11 +44,11 @@ class MicrophoneHandler(object) :
         # Set up and cache window for signal
         self.window = hamming(kBufferSize)
 
-        # Track last time we classified, so we can debounce the signal
-        self.last_classified = 1024     # Arbitrarily high number so that we start off with no debouncing
-
         # Set up our manager for extracting features from audio buffers for classification
         self.feature_extractor = FeatureExtractor(num_channels)
+
+        # Set up our classifier for determining events from MFCCs
+        self.classifier = 
 
     # Receive data and send back a string indicating the event that occurred.
     # Returns empty string if no event occurred
@@ -64,48 +57,16 @@ class MicrophoneHandler(object) :
         buffer_filled = self._update_buffers(data)
 
         if buffer_filled:
-            # Figure out what event just occurred!
-            # event = self._classify_event(self.buffers[self.current_buffer])
-
             # Extract events
             # TODO: get this actually working
-            features = self.feature_extractor.extract_mfccs(self.buffers[self.current_buffer])
-            print features
+            mfccs = self.feature_extractor.extract_mfccs(self.buffers[self.current_buffer])
+            event = self.classifier.classify(mfccs)
 
             # Move to next active buffer. Don't worry about clearing buffer,
             # as it will be fully overwritten before being used again
             self.current_buffer = (self.current_buffer - 1) % kBufferCount
 
         return event
-
-    # Takes a full buffer of windowed data and classifies it into 
-    def _classify_event(self, data):
-        classification = ""
-
-        # Take real-optimized FFT and convert to power
-        freq_powers = abs(rfft(data, n=kBufferFFTBins))
-
-        # Debounce the power calculation so we don't classify unnecessarily often
-        dc_debounced = freq_powers[0] * (1.0 - (kDebounceBackoff ** self.last_classified))
-
-        # Really simple kick/snare classification
-        # Only bother checking if we should classify if there is a beat box attempt happening
-        if dc_debounced > kDCThreshold:
-            bass_power = sum(freq_powers[1:kBassIndexThreshold])
-            treble_power = sum(freq_powers[kBassIndexThreshold:])
-            treble_bass_ratio = treble_power / float(bass_power)
-
-            if treble_bass_ratio > kTrebleBassRatio:
-                classification = "snare"
-            else:
-                classification = "kick"
-
-            # Reset our last classified counter
-            self.last_classified = 0
-        else:
-            self.last_classified += 1
-
-        return classification
 
     # Update buffers in streaming fashion, windowing them in the process.
     # Returns True if our current buffer fills and False otherwise

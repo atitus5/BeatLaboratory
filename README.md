@@ -9,8 +9,5 @@ complicated rhythms.
 To play:
 `./play.sh`
 
-NOTE: to use the MFCC extractor (i.e. for more sophisticated mic input classification
-to work), make sure to `cd engine/; make` before playing for the first time.
-
 Image Credit
 kick, snare: Artem Kovyazin
