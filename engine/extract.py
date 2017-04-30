@@ -45,12 +45,12 @@ class FeatureExtractor(object) :
         # Compute Mel-frequency Spectral Coefficients (MFSCs)
         abs_spectrum = np.asarray(map(abs, spectrum)).T
         energies = np.dot(kMelFilterBank, abs_spectrum)
-        msfc = np.maximum(np.multiply(-50.0, np.ones(kMelFilterBank.shape[0])),
+        mfsc = np.maximum(np.multiply(-50.0, np.ones(kMelFilterBank.shape[0])),
                           np.log(energies))
 
         # Compute Mel-frequency Cepstral Coefficients (MFCCs)
         # mfcc[i] = sum_{j=1}^{23.0} (mfsc[j] * cos(pi * i / 23.0 * (j - 0.5))
         #         = C * msfc
-        mfcc =  np.dot(self.dct, msfc.reshape((msfc.shape[0], 1)))
+        mfcc =  np.dot(self.dct, mfsc.reshape((mfsc.shape[0], 1)))
 
         return mfcc

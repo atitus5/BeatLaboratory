@@ -12,10 +12,10 @@ class SVMClassifier(object) :
 
         # Map integer SVM classes to event labels
         self.class2label = {
-            1: "",
-            2: "kick",
-            3: "snare",
-            4: "hihat" 
+            0: "",
+            1: "kick",
+            2: "hihat",
+            3: "snare"
         }
 
     # Trains SVM using given matrix of MFCC features and labels

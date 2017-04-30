@@ -48,7 +48,7 @@ class MicrophoneHandler(object) :
         self.feature_extractor = FeatureExtractor(num_channels)
 
         # Set up our classifier for determining events from MFCCs
-        self.classifier = 
+        self.classifier = SVMClassifier()
 
     # Receive data and send back a string indicating the event that occurred.
     # Returns empty string if no event occurred
@@ -60,7 +60,7 @@ class MicrophoneHandler(object) :
             # Extract events
             # TODO: get this actually working
             mfccs = self.feature_extractor.extract_mfccs(self.buffers[self.current_buffer])
-            event = self.classifier.classify(mfccs)
+            #event = self.classifier.classify(mfccs)
 
             # Move to next active buffer. Don't worry about clearing buffer,
             # as it will be fully overwritten before being used again
