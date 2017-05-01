@@ -6,6 +6,7 @@ import math
 import numpy as np
 from numpy.fft import rfft
 from scipy.signal import hamming
+import time
 
 import sys
 sys.path.append('..')
@@ -17,8 +18,10 @@ from common.audio import *
 # and one is "free" for overflow when a buffer fills. The "real-time"
 # buffer is updated with the newest data while the delayed buffers
 # are updated with delayed data. The "real-time" buffer rotates regularly.
-kBufferSize = int(kSampleRate * 0.100)      # 25 ms
-kBufferSpacing = int(kSampleRate * 0.010)   # 10 ms
+kBufferTime = 0.100     # 100 ms
+kBufferShift = 0.010    # 10 ms
+kBufferSize = int(kSampleRate * kBufferTime)
+kBufferSpacing = int(kSampleRate * kBufferShift)
 kBufferCount = int(math.ceil(kBufferSize / float(kBufferSpacing))) + 1
 
 from extract import *
@@ -46,6 +49,10 @@ class MicrophoneHandler(object) :
 
         # Set up our manager for extracting features from audio buffers for classification
         self.feature_extractor = FeatureExtractor(num_channels)
+        self.training = False
+        self.training_start_t = 0
+        self.mfccs_buffer = []
+        self.labels = []
 
         # Set up our classifier for determining events from MFCCs
         self.classifier = SVMClassifier()
@@ -53,6 +60,7 @@ class MicrophoneHandler(object) :
     # Receive data and send back a string indicating the event that occurred.
     # Returns empty string if no event occurred
     def add_data(self, data):
+        add_time = time.clock()
         event = ""
         buffer_filled = self._update_buffers(data)
 
@@ -60,13 +68,38 @@ class MicrophoneHandler(object) :
             # Extract events
             # TODO: get this actually working
             mfccs = self.feature_extractor.extract_mfccs(self.buffers[self.current_buffer])
-            #event = self.classifier.classify(mfccs)
+            if self.training:
+                self.mfccs_buffer.append(mfccs)
+                training_t = add_time - self.training_start_t
+                if abs(training_t - self.gems[self.gem_idx][0]) < kBufferTime:
+                    # Add label for this current time
+                    self.labels.append(self.gems[self.gem_idx][1])
+                    self.gem_idx += 1
+                else:
+                    self.labels.append(-1)  # No label
 
             # Move to next active buffer. Don't worry about clearing buffer,
             # as it will be fully overwritten before being used again
             self.current_buffer = (self.current_buffer - 1) % kBufferCount
 
         return event
+
+    def start_training(self, gems):
+        print gems
+        self.mfccs_buffer = []
+        self.labels = []
+        self.gems = gems
+        self.gem_idx = 0
+        self.training_start_t = time.clock()
+        self.training = True
+
+    def stop_training(self):
+        self.training = False
+        self.training_start_t = 0
+
+    def train_classifier(self):
+        self.classifier.train(self.mfccs_buffer, self.labels)
+
 
     # Update buffers in streaming fashion, windowing them in the process.
     # Returns True if our current buffer fills and False otherwise
