@@ -13,8 +13,8 @@ kMeasureSpacing = 20 # vertical space between measures
 # gem image filepaths
 kImages = [
     '../data/kick.png',
-    '../data/snare.png',
-    '../data/hihat.png'
+    '../data/hihat.png',
+    '../data/snare.png'
 ]
 
 # graphics that indirectly affect gameplay
