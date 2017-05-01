@@ -112,6 +112,8 @@ class MainWidget(BaseWidget) :
             self.player.on_button_down(0)
         elif event == 'snare':
             self.player.on_button_down(1)
+        elif event == 'hihat':
+            self.player.on_button_down(2)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now

@@ -13,12 +13,13 @@ kMeasureSpacing = 20 # vertical space between measures
 # gem image filepaths
 kImages = [
     '../data/kick.png',
-    '../data/snare.png'
+    '../data/snare.png',
+    '../data/hihat.png'
 ]
 
 # graphics that indirectly affect gameplay
 kNumGems = 8 # numbber of gems allowed per bar
-kNumPreviews = 1 # number of measures ahead shown
+kNumPreviews = 5 # number of measures ahead shown
 
 # these are just convenient
 kWindowWidth = (kNumGems * kGemWidth) + (2 * kThickness) + kLeftX + kRightX
@@ -175,8 +176,7 @@ class MeasureDisplay(InstructionGroup):
         super(MeasureDisplay, self).__init__()
         w = kNumGems * kGemWidth + 2*kThickness
         h = kGemHeight + 2*kThickness
-        self.box = BoxDisplay(pos=pos, size=(w, h), thickness=kThickness)
-        self.add(self.box)
+        self.pos = pos
 
         self.gems = []
         for gem in gems:
@@ -186,32 +186,32 @@ class MeasureDisplay(InstructionGroup):
             self.gems.append(gd)
             self.add(gd)
 
-        self.nbd = NowbarDisplay(pos[0]+kThickness/2, pos[0]+w-kThickness/2, pos[1], pos[1]+h)
-        self.add(self.nbd)
-
-    # move nowbar
-    def set_progress(self, progress):
-        self.nbd.set_progress(progress)
-
     # hit gem (gem_idx is relative to start of measure)
     def gem_hit(self, gem_idx):
         self.gems[gem_idx].on_hit()
 
     # update measure position on screen
     def set_pos(self, pos):
-        xy = (pos[0] - self.box.outer.pos[0], pos[1] - self.box.outer.pos[1])
-        self.box.set_pos(pos)
-        self.nbd.set_translate(xy)
+        xy = (pos[0] - self.pos[0], pos[1] - self.pos[1])
         for gem in self.gems:
             x = gem.gem.pos[0] + xy[0]
             y = gem.gem.pos[1] + xy[1]
             gem.set_pos((x,y))
+        self.pos = pos
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
 class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data, seek):
         super(BeatMatchDisplay, self).__init__()
+
+        w = kNumGems * kGemWidth + 2*kThickness
+        h = kGemHeight + 2*kThickness
+        for i in range(kNumPreviews, -1, -1):
+            y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            self.add(BoxDisplay(pos=(kLeftX, y), size=(w,h), thickness=kThickness))
+        self.nbd = NowbarDisplay(kLeftX+kThickness/2, kLeftX+w-kThickness/2, y, y+h)
+        self.add(self.nbd)
 
         # process song data to pre-generate bar graphics
         self.bars = []
@@ -293,7 +293,7 @@ class BeatMatchDisplay(InstructionGroup):
         # don't move nowbar during first measure since we add a dead measure at the beginning
         if self.current_bar == 0:
             progress = 0
-        self.bars[self.current_bar].set_progress(progress)
+        self.nbd.set_progress(progress)
 
 
 # HELPER FUNCTIONS
