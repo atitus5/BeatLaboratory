@@ -77,6 +77,7 @@ from mic import *
 song_path = '../data/BeatItNoDrums' # could make command argument in future
 snapGems = True # snap gems to fraction of a barline.
 seek = 0.0 # start x seconds into song (pass in via command line)
+record = True
 
 
 # MAIN WIDGET
@@ -85,8 +86,8 @@ class MainWidget(BaseWidget) :
         super(MainWidget, self).__init__()
         # Set up audio input and output
         self.writer = AudioWriter('data') # for debugging audio output
-        self.music_audio = MusicAudio(kNumChannels, listen_func=self.writer.add_audio)
-        self.mic_audio = MicAudio(kNumChannels, input_func=self.process_mic_input)
+        self.music_audio = MusicAudio(kNumChannels)
+        self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
 
         # game audio output
         self.mixer = Mixer()
@@ -126,6 +127,8 @@ class MainWidget(BaseWidget) :
         if keycode[1] == 'p':
             self.clock.toggle()
             self.music_audio_ctrl.toggle()
+            if record:
+                self.writer.toggle()
 
         # button down
         button_idx = lookup(keycode[1], '12', (0,1))

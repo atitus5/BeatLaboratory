@@ -257,6 +257,27 @@ class MicAudio(Audio):
 
         return out_dev, in_dev, buf_size, sample_rate
 
+    # must call this every frame.
+    def on_update(self):
+        t_start = time.time()
+
+        # get input audio if desired
+        if self.input_func:
+            try:
+                num_frames = self.stream.get_read_available() # number of frames to ask for
+                if num_frames:
+                    data_str = self.stream.read(num_frames, False)
+                    data_np = np.fromstring(data_str, dtype=np.float32)
+                    self.input_func(data_np, self.num_channels)
+                    if self.listen_func:
+                        self.listen_func(data_np, self.num_channels)
+            except IOError, e:
+                print 'got error', e
+
+        dt = time.time() - t_start
+        a = 0.9
+        self.cpu_time = a * self.cpu_time + (1-a) * dt
+
 def print_audio_devices():
     audio = pyaudio.PyAudio()
     cnt = audio.get_host_api_count()
