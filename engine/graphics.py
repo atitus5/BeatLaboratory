@@ -171,27 +171,39 @@ class NowbarDisplay(InstructionGroup):
 #   where 0 <= beat_num < kNumBeats specifies position
 #   and beat_type specifies type of hit needed
 class MeasureDisplay(InstructionGroup):
-    def __init__(self, pos, gems):
+    def __init__(self, pos, gems, width, height):
         super(MeasureDisplay, self).__init__()
-        w = kNumGems * kGemWidth + 2*kThickness
-        h = kGemHeight + 2*kThickness
-        self.box = BoxDisplay(pos=pos, size=(w, h), thickness=kThickness)
-        self.add(self.box)
+
+        #passed-in values of measure width and height
+        self.width = width
+        self.height = height
+
+        #position variables for the measure
+        self.moving = False
+        self.current_pos = pos
+        self.final_pos = pos
+        self.speed = np.array([0, 0])
 
         self.gems = []
-        for gem in gems:
-            x = pos[0] + kThickness + gem[0]*kGemWidth
-            y = pos[1] + kThickness
-            gd = GemDisplay(pos=(x,y), size=(kGemWidth, kGemHeight), beat=gem[1])
-            self.gems.append(gd)
-            self.add(gd)
+        for i in range(len(gems)):
 
-        self.nbd = NowbarDisplay(pos[0]+kThickness/2, pos[0]+w-kThickness/2, pos[1], pos[1]+h)
-        self.add(self.nbd)
+            if gems[i] != None:
+                x = self.current_pos[0] + float(i * self.width)/kNumGems
+                y = self.current_pos[1] + kThickness
 
-    # move nowbar
-    def set_progress(self, progress):
-        self.nbd.set_progress(progress)
+                gd = GemDisplay(pos=np.array([x, y]), size=(kGemWidth, kGemHeight), beat=gem[1])
+                self.gems.append(gd)
+                self.add(gd)
+            else:
+                self.gems.append(None)
+
+        #measure no longer has a nowbar
+        # self.nbd = NowbarDisplay(pos[0]+kThickness/2, pos[0]+w-kThickness/2, pos[1], pos[1]+h)
+        # self.add(self.nbd)
+
+    # no longer set_progress
+    # def set_progress(self, progress):
+    #     self.nbd.set_progress(progress)
 
     # hit gem (gem_idx is relative to start of measure)
     def gem_hit(self, gem_idx):
@@ -199,13 +211,38 @@ class MeasureDisplay(InstructionGroup):
 
     # update measure position on screen
     def set_pos(self, pos):
-        xy = (pos[0] - self.box.outer.pos[0], pos[1] - self.box.outer.pos[1])
-        self.box.set_pos(pos)
-        self.nbd.set_translate(xy)
-        for gem in self.gems:
-            x = gem.gem.pos[0] + xy[0]
-            y = gem.gem.pos[1] + xy[1]
-            gem.set_pos((x,y))
+        initial = self.current_pos
+        final = pos
+
+        self.speed = final - initial
+        self.final_pos = final
+
+        self.moving = True
+
+    def set_width(self, width):
+        self.width = width
+
+    def set_height(self, height):
+        self.height = height
+
+    def on_update(self, dt):
+        if self.current_pos == self.final_pos:
+            self.moving = False
+            
+        if self.moving:
+            self.current_pos += self.speed * dt
+
+            if self.current_pos[1] > self.final_pos[1]:
+                self.current_pos = self.final_pos
+
+            for i in range(len(self.gems)):
+                if self.gems[i] != None:
+                    x = self.current_pos[0] + float(i * self.width)/kNumGems
+                    y = self.current_pos[1] + kThickness
+                    gem.set_pos(np.array([x,y]))
+
+
+
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
