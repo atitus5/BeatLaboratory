@@ -13,8 +13,8 @@ kMeasureSpacing = 20 # vertical space between measures
 # gem image filepaths
 kImages = [
     '../data/kick.png',
-    '../data/snare.png',
-    '../data/hihat.png'
+    '../data/hihat.png',
+    '../data/snare.png'
 ]
 
 # graphics that indirectly affect gameplay
@@ -176,28 +176,76 @@ class NowbarDisplay(InstructionGroup):
 #   where 0 <= beat_num < kNumBeats specifies position
 #   and beat_type specifies type of hit needed
 class MeasureDisplay(InstructionGroup):
-    def __init__(self, pos, gems):
+    def __init__(self, pos, gems, width, height):
         super(MeasureDisplay, self).__init__()
-        w = kNumGems * kGemWidth + 2*kThickness
-        h = kGemHeight + 2*kThickness
-        self.pos = pos
+
+        #passed-in values of measure width and height
+        self.width = width
+        self.height = height
+
+        #position variables for the measure
+        self.moving = False
+        self.current_pos = pos
+        self.final_pos = pos
+        self.speed = np.array([0, 0])
 
         self.gems = []
-        for gem in gems:
-            x = pos[0] + kThickness + gem[0]*kGemWidth
-            y = pos[1] + kThickness
-            gd = GemDisplay(pos=(x,y), size=(kGemWidth, kGemHeight), beat=gem[1])
-            self.gems.append(gd)
-            self.add(gd)
+        for i in range(len(gems)):
+            if gems[i] != None:
+                x = self.current_pos[0] + float(i * self.width)/kNumGems
+                y = self.current_pos[1] + kThickness
+
+                gd = GemDisplay(pos=np.array([x, y]), size=(kGemWidth, kGemHeight), beat=gems[i][1])
+                self.gems.append(gd)
+                self.add(gd)
+            else:
+                self.gems.append(None)
+
+    # hit gem (gem_idx is relative to start of measure)
+    def gem_hit(self, gem_idx):
+        self.get_gem(gem_idx).on_hit()
 
     # update measure position on screen
     def set_pos(self, pos):
-        xy = (pos[0] - self.pos[0], pos[1] - self.pos[1])
-        for gem in self.gems:
-            x = gem.gem.pos[0] + xy[0]
-            y = gem.gem.pos[1] + xy[1]
-            gem.set_pos((x,y))
-        self.pos = pos
+        initial = self.current_pos
+        final = pos
+
+        self.speed = np.array([final[0] - initial[0], 4.0*final[1] - initial[1]])
+        print self.speed
+        self.final_pos = final
+
+        self.moving = True
+
+    def set_width(self, width):
+        self.width = width
+
+    def set_height(self, height):
+        self.height = height
+
+    def get_gem(self, gem_idx):
+        filtered_gems = filter(lambda x : x != None, self.gems)
+        return filtered_gems[gem_idx]
+
+
+    def on_update(self, dt):
+        if self.current_pos[0] == self.final_pos[0] and self.current_pos[1] == self.final_pos[1]:
+            self.moving = False
+            return False
+
+        if self.moving:
+            print dt
+            self.current_pos += self.speed * dt
+
+            if self.current_pos[1] > self.final_pos[1]:
+                self.current_pos = self.final_pos
+
+            for i in range(len(self.gems)):
+                if self.gems[i] != None:
+                    x = self.current_pos[0] + float(i * self.width)/kNumGems
+                    y = self.current_pos[1] + kThickness
+                    self.gems[i].set_pos(np.array([x,y]))
+
+            return True
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
@@ -213,6 +261,8 @@ class BeatMatchDisplay(InstructionGroup):
         self.nbd = NowbarDisplay(kLeftX+kThickness/2, kLeftX+w-kThickness/2, y, y+h)
         self.add(self.nbd)
 
+        self.measure_updates = []
+
         # process song data to pre-generate bar graphics
         self.bars = []
         self.bar_durations = []
@@ -223,13 +273,19 @@ class BeatMatchDisplay(InstructionGroup):
             bar = []
             barlength = song_data.barlines[i] - song_data.barlines[i-1]
             self.bar_durations.append(barlength)
+            last_index = 0
             while j < len(song_data.gems) and song_data.gems[j][0] < song_data.barlines[i]:
                 frac = (song_data.gems[j][0] - song_data.barlines[i-1])
                 new_idx = np.round(kNumGems * frac * barlength**-1)
+
+                for k in range(int(last_index + 1), int(new_idx)):
+                    bar.append(None)
+
                 bar.append((new_idx, song_data.gems[j][1]))
                 j += 1
-            self.bar_num_gems.append(len(bar))
-            self.bars.append(MeasureDisplay(pos=(kLeftX, kBottomY), gems=bar))
+                last_index = new_idx
+            self.bar_num_gems.append(len(filter(lambda x: x != None, bar)))
+            self.bars.append(MeasureDisplay(pos=(kLeftX, kBottomY), gems=bar, height=h, width=w))
             i += 1
 
         # current bar and gem (probably 0 unless seek is set)
@@ -262,16 +318,19 @@ class BeatMatchDisplay(InstructionGroup):
         for i in range(min(kNumPreviews, len(self.bars) - self.current_bar - 1)):
             y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
             self.bars[self.current_bar + i].set_pos((kLeftX, y))
+            self.measure_updates.append(self.bars[self.current_bar + i])
         # add new preview measure
         if self.current_bar + kNumPreviews < len(self.bars):
             self.add(self.bars[self.current_bar + kNumPreviews])
 
     # called by player, sends gem hit to correct measure
     def gem_hit(self, gem_idx):
-        self.__find_gem(gem_idx).on_hit()
+        if self.__find_gem(gem_idx) != None:
+            self.__find_gem(gem_idx).on_hit()
 
     def gem_miss(self, gem_idx):
-        self.__find_gem(gem_idx).on_miss()
+        if self.__find_gem(gem_idx) != None:
+            self.__find_gem(gem_idx).on_miss()
 
     def __find_gem(self, gem_idx):
         # this logic assumes gem hit will never be given more than +/- 1 bar early/late
@@ -301,6 +360,16 @@ class BeatMatchDisplay(InstructionGroup):
         if self.current_bar == 0:
             progress = 0
         self.nbd.set_progress(progress)
+
+        remove_measures = []
+        for measure in self.measure_updates:
+            animate = measure.on_update(dt)
+            if not animate:
+                remove_measures.append(measure)
+
+        for measure in remove_measures:
+            self.measure_updates.remove(measure)
+
 
 
 # HELPER FUNCTIONS

@@ -56,11 +56,12 @@ class MicrophoneHandler(object) :
 
         # Set up our classifier for determining events from MFCCs
         self.classifier = SVMClassifier()
+        self.is_trained = False
 
     # Receive data and send back a string indicating the event that occurred.
     # Returns empty string if no event occurred
     def add_data(self, data):
-        add_time = time.clock()
+        add_time = time.time()
         event = ""
         buffer_filled = self._update_buffers(data)
 
@@ -71,26 +72,30 @@ class MicrophoneHandler(object) :
             if self.training:
                 self.mfccs_buffer.append(mfccs)
                 training_t = add_time - self.training_start_t
-                if abs(training_t - self.gems[self.gem_idx][0]) < kBufferTime:
+                t_to_gem = abs(training_t - self.gems[self.gem_idx][0])
+                if t_to_gem < kBufferTime:
                     # Add label for this current time
                     self.labels.append(self.gems[self.gem_idx][1])
                     self.gem_idx += 1
                 else:
                     self.labels.append(-1)  # No label
 
+            if self.is_trained:
+                event = self.classifier.classify(mfccs)
+
             # Move to next active buffer. Don't worry about clearing buffer,
             # as it will be fully overwritten before being used again
             self.current_buffer = (self.current_buffer - 1) % kBufferCount
 
+
         return event
 
     def start_training(self, gems):
-        print gems
         self.mfccs_buffer = []
         self.labels = []
         self.gems = gems
         self.gem_idx = 0
-        self.training_start_t = time.clock()
+        self.training_start_t = time.time()
         self.training = True
 
     def stop_training(self):
@@ -99,6 +104,7 @@ class MicrophoneHandler(object) :
 
     def train_classifier(self):
         self.classifier.train(self.mfccs_buffer, self.labels)
+        self.is_trained = True
 
 
     # Update buffers in streaming fashion, windowing them in the process.

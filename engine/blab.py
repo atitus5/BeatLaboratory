@@ -49,6 +49,7 @@ class MainWidget(BaseWidget) :
         # Set up audio input and output
         self.writer = AudioWriter('data') # for debugging audio output
         self.music_audio = MusicAudio(kNumChannels)
+
         if usemic:
             self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
 
@@ -146,7 +147,7 @@ class SongData(object):
             gems_data.sort()
             # handle multiple button gems (make a gem for each one)
             for g in gems_data:
-                self.gems.append((float(g[0]), (int(g[1][-1])-1) % 2))
+                self.gems.append((float(g[0]), (int(g[1][-1])-1) % len(kImages)))
             self.gems.sort()
 
         # read barline file
