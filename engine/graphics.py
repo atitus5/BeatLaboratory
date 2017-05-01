@@ -201,17 +201,12 @@ class MeasureDisplay(InstructionGroup):
             else:
                 self.gems.append(None)
 
-    # hit gem (gem_idx is relative to start of measure)
-    def gem_hit(self, gem_idx):
-        self.get_gem(gem_idx).on_hit()
-
     # update measure position on screen
     def set_pos(self, pos):
         initial = self.current_pos
         final = pos
 
         self.speed = np.array([final[0] - initial[0], 4.0*final[1] - initial[1]])
-        print self.speed
         self.final_pos = final
 
         self.moving = True
@@ -233,7 +228,6 @@ class MeasureDisplay(InstructionGroup):
             return False
 
         if self.moving:
-            print dt
             self.current_pos += self.speed * dt
 
             if self.current_pos[1] > self.final_pos[1]:
@@ -335,11 +329,11 @@ class BeatMatchDisplay(InstructionGroup):
     def __find_gem(self, gem_idx):
         # this logic assumes gem hit will never be given more than +/- 1 bar early/late
         if 0 <= (gem_idx - self.gem_offset) < self.bar_num_gems[self.current_bar]:
-            return self.bars[self.current_bar].gems[gem_idx - self.gem_offset]
+            return self.bars[self.current_bar].get_gem(gem_idx - self.gem_offset)
         elif (gem_idx - self.gem_offset) < 0:
-            return self.bars[self.current_bar-1].gems[gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1])]
+            return self.bars[self.current_bar-1].get_gem(gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1]))
         else:
-            return self.bars[self.current_bar+1].gems[gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar])]
+            return self.bars[self.current_bar+1].get_gem(gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar]))
 
     # call every frame to move nowbar and check if measures need updating
     def on_update(self, dt):
@@ -361,15 +355,10 @@ class BeatMatchDisplay(InstructionGroup):
             progress = 0
         self.nbd.set_progress(progress)
 
-        remove_measures = []
         for measure in self.measure_updates:
             animate = measure.on_update(dt)
             if not animate:
-                remove_measures.append(measure)
-
-        for measure in remove_measures:
-            self.measure_updates.remove(measure)
-
+                self.measure_updates.remove(measure)
 
 
 # HELPER FUNCTIONS
