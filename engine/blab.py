@@ -64,6 +64,7 @@ class MainWidget(BaseWidget) :
         # Set up microphone input handling
         if usemic:
             self.mic_handler = MicrophoneHandler(kNumChannels)
+        self.recording = False
 
         # game text
         self.score_label = botleft_label()
@@ -95,6 +96,7 @@ class MainWidget(BaseWidget) :
             self.bg.play_toggle()
             if record:
                 self.writer.toggle()
+                self.recording = not self.recording
 
         # button down
         button_idx = lookup(keycode[1], '12', (0,1))
@@ -105,7 +107,7 @@ class MainWidget(BaseWidget) :
         if not usemic:
             return
         # Send mic input to our handler
-        event = self.mic_handler.add_data(data)
+        event = self.mic_handler.add_data(data, self.recording)
         if event:
             print event
         if event == 'kick':

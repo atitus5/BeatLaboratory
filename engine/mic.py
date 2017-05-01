@@ -5,8 +5,7 @@ import math
 
 import numpy as np
 from numpy.fft import rfft
-from scipy.signal import hamming
-import time
+from scipy.signal import hamming, lfilter
 
 import sys
 sys.path.append('..')
@@ -24,8 +23,10 @@ kBufferSize = int(kSampleRate * kBufferTime)
 kBufferSpacing = int(kSampleRate * kBufferShift)
 kBufferCount = int(math.ceil(kBufferSize / float(kBufferSpacing))) + 1
 
-from extract import *
-from classifier import *
+kBufferFFTBins = 512
+
+# Experimentally determined constants
+kDebounceBackoff = 0.98     # Used to prevent multiple classifications in a row
 
 # Used to handle streaming audio input data and return events corresponding
 # to beatbox events
@@ -44,68 +45,51 @@ class MicrophoneHandler(object) :
             # Fill in previous buffers, except the first one which is still unused
             self.buffer_indices[i + 1] = i * kBufferSpacing
 
+        # Set up pre-emphasis filter coefficients
+        self.s_pe = 1.0      # Output; s_pe[n]
+        self.s_of = [1.0, -0.97]     # Input;  s_of[n] - 0.97s_of[n - 1] 
+
         # Set up and cache window for signal
         self.window = hamming(kBufferSize)
 
-        # Set up our manager for extracting features from audio buffers for classification
-        self.feature_extractor = FeatureExtractor(num_channels)
-        self.training = False
-        self.training_start_t = 0
-        self.mfccs_buffer = []
-        self.labels = []
-
-        # Set up our classifier for determining events from MFCCs
-        self.classifier = SVMClassifier()
-        self.is_trained = False
+        # Track last time we classified, so we can debounce the signal
+        self.last_classified = 1024     # Arbitrarily high number so that we start off with no debouncing
 
     # Receive data and send back a string indicating the event that occurred.
     # Returns empty string if no event occurred
-    def add_data(self, data):
+    def add_data(self, data, record):
         add_time = time.time()
         event = ""
         buffer_filled = self._update_buffers(data)
 
         if buffer_filled:
-            # Extract events
-            # TODO: get this actually working
-            mfccs = self.feature_extractor.extract_mfccs(self.buffers[self.current_buffer])
-            if self.training:
-                self.mfccs_buffer.append(mfccs)
-                training_t = add_time - self.training_start_t
-                t_to_gem = abs(training_t - self.gems[self.gem_idx][0])
-                if t_to_gem < kBufferTime:
-                    # Add label for this current time
-                    self.labels.append(self.gems[self.gem_idx][1])
-                    self.gem_idx += 1
-                else:
-                    self.labels.append(-1)  # No label
-
-            if self.is_trained:
-                event = self.classifier.classify(mfccs)
+            # Extract event
+            event = self._classify_event(self.buffers[self.current_buffer], record)
 
             # Move to next active buffer. Don't worry about clearing buffer,
             # as it will be fully overwritten before being used again
             self.current_buffer = (self.current_buffer - 1) % kBufferCount
 
-
         return event
 
-    def start_training(self, gems):
-        self.mfccs_buffer = []
-        self.labels = []
-        self.gems = gems
-        self.gem_idx = 0
-        self.training_start_t = time.time()
-        self.training = True
+    # Takes a full buffer of windowed data and classifies it into 
+    def _classify_event(self, data, record):
+        classification = ""
 
-    def stop_training(self):
-        self.training = False
-        self.training_start_t = 0
+        # Pre-emphasize signal (we need to recognize those snare/hi-hat fricatives!!)
+        # emphasized_audio = lfilter(self.s_of, self.s_pe, data)
 
-    def train_classifier(self):
-        self.classifier.train(self.mfccs_buffer, self.labels)
-        self.is_trained = True
+        # Take real-optimized FFT and convert to power
+        # freq_powers = abs(rfft(emphasized_audio, n=kBufferFFTBins))
+        freq_powers = abs(rfft(data, n=kBufferFFTBins))
 
+        # Debounce the frequencies so we don't classify unnecessarily often
+        freq_powers_debounced = np.multiply(1.0 - (kDebounceBackoff ** self.last_classified), freq_powers)
+
+        if record:
+            print ",".join(map(str, freq_powers))
+
+        return classification
 
     # Update buffers in streaming fashion, windowing them in the process.
     # Returns True if our current buffer fills and False otherwise
