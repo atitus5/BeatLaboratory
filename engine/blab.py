@@ -6,13 +6,13 @@ sys.path.append('..')
 
 # command line args
 seek = 0.0
-if len(sys.argv) > 2:
-    seek = float(sys.argv[2])
+if len(sys.argv) >= 2:
+    seek = float(sys.argv[1])
 usemic = True
 record = False
-if len(sys.argv) > 3:
-    usemic = not sys.argv[3] == 'nomic'
-    record = sys.argv[3] == 'record'
+if len(sys.argv) >= 3:
+    usemic = not sys.argv[2] == 'nomic'
+    record = sys.argv[2] == 'record'
 
 # other game files
 from graphics import *
@@ -49,7 +49,9 @@ class MainWidget(BaseWidget) :
         # Set up audio input and output
         self.writer = AudioWriter('data') # for debugging audio output
         self.music_audio = MusicAudio(kNumChannels)
-        self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
+
+        if usemic:
+            self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
 
         # game audio output
         self.mixer = Mixer()
@@ -112,13 +114,16 @@ class MainWidget(BaseWidget) :
             self.player.on_button_down(0)
         elif event == 'snare':
             self.player.on_button_down(1)
+        elif event == 'hihat':
+            self.player.on_button_down(2)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now
         self.now += dt
         self.player.on_update(dt)
         self.music_audio.on_update()
-        self.mic_audio.on_update()
+        if usemic:
+            self.mic_audio.on_update()
         self.score_label.text = 'score: ' + str(self.player.get_score())
         self.streak_label.text = str(self.player.get_streak()) + ' in a row'
         self.multiplier_label.text = 'x' + str(self.player.get_multiplier())
@@ -182,7 +187,10 @@ class Player(object):
         self.now = seek
         self.score = 0
         self.streak = 0
-        self.mute = False
+
+        # skip ahead in case of seeks
+        while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
+            self.next_gem += 1
 
     # called by MainWidget
     def on_button_down(self, lane):
@@ -195,29 +203,28 @@ class Player(object):
                         self.next_gem += 1
                         self.streak += 1
                         self.score += 1 * min(4, 1 + self.streak/5)
-                        self.mute = False
                         return
                 else:
                     break
 
             # check for lane (wrong beat) miss
-            if abs(self.gem_data[self.next_gem][0] - self.now) < kSlopWindow:   
-                    self.next_gem += 1
+            if abs(self.gem_data[self.next_gem][0] - self.now) < kSlopWindow:
+                self.display.gem_miss(self.next_gem)
+                self.next_gem += 1
 
         # else temporal miss
 
         # on miss
         self.streak = 0
-        self.mute = True
 
     # needed to check if for pass gems (ie, went past the slop window)
     def on_update(self, dt):
         self.now += dt
         # check for temporal miss
         while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
+            self.display.gem_miss(self.next_gem)
             self.next_gem += 1
             self.streak = 0
-            self.mute = True
         self.display.on_update(dt)
 
     def get_score(self):
