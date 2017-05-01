@@ -147,7 +147,7 @@ class SongData(object):
             gems_data.sort()
             # handle multiple button gems (make a gem for each one)
             for g in gems_data:
-                self.gems.append((float(g[0]), (int(g[1][-1])-1) % 2))
+                self.gems.append((float(g[0]), (int(g[1][-1])-1) % len(kImages)))
             self.gems.sort()
 
         # read barline file
