@@ -33,7 +33,7 @@ import numpy as np
 
 # CONSTANTS
 # gameplay
-kSlopWindow = .30 # amount of time gem can be hit early/late (more generous for mic)
+kSlopWindow = .20 # amount of time gem can be hit early/late (more generous for mic)
 kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of barline
 snapGems = True # snap gems to fraction of a barline.
 
@@ -49,7 +49,9 @@ class MainWidget(BaseWidget) :
         # Set up audio input and output
         self.writer = AudioWriter('data') # for debugging audio output
         self.music_audio = MusicAudio(kNumChannels)
-        self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
+
+        if usemic:
+            self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
 
         # game audio output
         self.mixer = Mixer()
@@ -99,7 +101,7 @@ class MainWidget(BaseWidget) :
                 self.recording = not self.recording
 
         # button down
-        button_idx = lookup(keycode[1], '12', (0,1))
+        button_idx = lookup(keycode[1], '123', (0,1,2))
         if button_idx != None:
             self.player.on_button_down(button_idx)
 
@@ -112,9 +114,9 @@ class MainWidget(BaseWidget) :
             print event
         if event == 'kick':
             self.player.on_button_down(0)
-        elif event == 'snare':
-            self.player.on_button_down(1)
         elif event == 'hihat':
+            self.player.on_button_down(1)
+        elif event == 'snare':
             self.player.on_button_down(2)
 
     def on_update(self) :
@@ -122,7 +124,8 @@ class MainWidget(BaseWidget) :
         self.now += dt
         self.player.on_update(dt)
         self.music_audio.on_update()
-        self.mic_audio.on_update()
+        if usemic:
+            self.mic_audio.on_update()
         self.score_label.text = 'score: ' + str(self.player.get_score())
         self.streak_label.text = str(self.player.get_streak()) + ' in a row'
         self.multiplier_label.text = 'x' + str(self.player.get_multiplier())
@@ -199,6 +202,7 @@ class Player(object):
                 if abs(self.gem_data[i][0] - self.now) < kSlopWindow:
                     if self.gem_data[i][1] == lane:
                         self.display.gem_hit(i)
+                        print 'hit', i
                         self.next_gem += 1
                         self.streak += 1
                         self.score += 1 * min(4, 1 + self.streak/5)
