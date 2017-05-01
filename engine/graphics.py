@@ -202,7 +202,7 @@ class MeasureDisplay(InstructionGroup):
                 self.gems.append(None)
 
     # update measure position on screen
-    def set_pos(self, pos):
+    def move(self, pos):
         initial = self.current_pos
         final = pos
 
@@ -210,6 +210,17 @@ class MeasureDisplay(InstructionGroup):
         self.final_pos = final
 
         self.moving = True
+
+    def set_pos(self, pos):
+        self.current_pos = pos
+        self.final_pos = pos
+        self.moving = False
+        for i in range(len(self.gems)):
+            if self.gems[i] != None:
+                x = self.current_pos[0] + float(i * self.width)/kNumGems
+                y = self.current_pos[1] + kThickness
+                self.gems[i].set_pos(np.array([x,y]))
+
 
     def set_width(self, width):
         self.width = width
@@ -311,7 +322,7 @@ class BeatMatchDisplay(InstructionGroup):
         # move preview measures up
         for i in range(min(kNumPreviews, len(self.bars) - self.current_bar - 1)):
             y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
-            self.bars[self.current_bar + i].set_pos((kLeftX, y))
+            self.bars[self.current_bar + i].move((kLeftX, y))
             self.measure_updates.append(self.bars[self.current_bar + i])
         # add new preview measure
         if self.current_bar + kNumPreviews < len(self.bars):
