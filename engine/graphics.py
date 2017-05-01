@@ -19,7 +19,7 @@ kImages = [
 
 # graphics that indirectly affect gameplay
 kNumGems = 8 # numbber of gems allowed per bar
-kNumPreviews = 5 # number of measures ahead shown
+kNumPreviews = 2 # number of measures ahead shown
 
 # these are just convenient
 kWindowWidth = (kNumGems * kGemWidth) + (2 * kThickness) + kLeftX + kRightX
@@ -109,8 +109,12 @@ class GemDisplay(InstructionGroup):
         self.gem.pos = pos
 
     # change to display this gem being hit
-    def on_hit(self):
+    def on_miss(self):
         self.color.rgba = (1,1,1,.25)
+
+    # change to display this gem being hit
+    def on_hit(self):
+        self.color.rgba = (1,1,1,0)
 
 
 # a rectangle border
@@ -186,10 +190,6 @@ class MeasureDisplay(InstructionGroup):
             self.gems.append(gd)
             self.add(gd)
 
-    # hit gem (gem_idx is relative to start of measure)
-    def gem_hit(self, gem_idx):
-        self.gems[gem_idx].on_hit()
-
     # update measure position on screen
     def set_pos(self, pos):
         xy = (pos[0] - self.pos[0], pos[1] - self.pos[1])
@@ -232,16 +232,17 @@ class BeatMatchDisplay(InstructionGroup):
             self.bars.append(MeasureDisplay(pos=(kLeftX, kBottomY), gems=bar))
             i += 1
 
-        # current bar (probably 0 unless seek is set)
+        # current bar and gem (probably 0 unless seek is set)
         self.current_bar = 0
+        self.gem_offset = 0
         while self.current_bar < len(self.bars) and seek > song_data.barlines[self.current_bar + 1]:
+            self.gem_offset += self.bar_num_gems[self.current_bar]
             self.current_bar += 1
 
-        self.gem_offset = 0
 
         # time into bar (probably 0s unless seek is set)
         temp_l = filter(lambda b: b < seek, song_data.barlines)
-        self.bar_dur = self.now - max(temp_l) if temp_l else 0.0
+        self.bar_dur = seek - max(temp_l) if temp_l else 0.0
 
         # show intial graphics
         for i in range(min(kNumPreviews + 1, len(self.bars) - self.current_bar - 1)):
@@ -267,13 +268,19 @@ class BeatMatchDisplay(InstructionGroup):
 
     # called by player, sends gem hit to correct measure
     def gem_hit(self, gem_idx):
+        self.__find_gem(gem_idx).on_hit()
+
+    def gem_miss(self, gem_idx):
+        self.__find_gem(gem_idx).on_miss()
+
+    def __find_gem(self, gem_idx):
         # this logic assumes gem hit will never be given more than +/- 1 bar early/late
         if 0 <= (gem_idx - self.gem_offset) < self.bar_num_gems[self.current_bar]:
-            self.bars[self.current_bar].gem_hit(gem_idx - self.gem_offset)
+            return self.bars[self.current_bar].gems[gem_idx - self.gem_offset]
         elif (gem_idx - self.gem_offset) < 0:
-            self.bars[self.current_bar-1].gem_hit(gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1]))
+            return self.bars[self.current_bar-1].gems[gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1])]
         else:
-            self.bars[self.current_bar+1].gem_hit(gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar]))
+            return self.bars[self.current_bar+1].gems[gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar])]
 
     # call every frame to move nowbar and check if measures need updating
     def on_update(self, dt):
