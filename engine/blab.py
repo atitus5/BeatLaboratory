@@ -49,7 +49,8 @@ class MainWidget(BaseWidget) :
         # Set up audio input and output
         self.writer = AudioWriter('data') # for debugging audio output
         self.music_audio = MusicAudio(kNumChannels)
-        self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
+        if usemic:
+            self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
 
         # game audio output
         self.mixer = Mixer()
@@ -120,7 +121,8 @@ class MainWidget(BaseWidget) :
         self.now += dt
         self.player.on_update(dt)
         self.music_audio.on_update()
-        self.mic_audio.on_update()
+        if usemic:
+            self.mic_audio.on_update()
         self.score_label.text = 'score: ' + str(self.player.get_score())
         self.streak_label.text = str(self.player.get_streak()) + ' in a row'
         self.multiplier_label.text = 'x' + str(self.player.get_multiplier())

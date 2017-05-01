@@ -6,7 +6,7 @@ kBottomY = 40 # bottom padding
 kTopY = 60 # top padding
 
 # graphics only
-kGemWidth = 100
+kGemWidth = 150
 kGemHeight = kGemWidth # (leave square since we are using images)
 kThickness = 5 # thickness of bar (>= 2)
 kMeasureSpacing = 20 # vertical space between measures
