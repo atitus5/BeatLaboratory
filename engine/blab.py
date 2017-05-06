@@ -33,7 +33,7 @@ import numpy as np
 
 # CONSTANTS
 # gameplay
-kSlopWindow = .20 # amount of time gem can be hit early/late (more generous for mic)
+kSlopWindow = .10 # amount of time gem can be hit early/late
 kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of barline
 snapGems = True # snap gems to fraction of a barline.
 

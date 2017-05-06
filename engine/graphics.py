@@ -6,8 +6,11 @@ kBottomY = 40 # bottom padding
 kTopY = 60 # top padding
 
 # graphics only
-kGemWidth = 150
-kGemHeight = kGemWidth # (leave square since we are using images)
+# kGemWindowWidth = 150
+kGemWindowWidth = 150
+kGemWindowHeight = kGemWindowWidth  # (leave square since we are using images)
+kGemWidth = 100
+kGemHeight = kGemWidth
 kThickness = 5 # thickness of bar (>= 2)
 kMeasureSpacing = 20 # vertical space between measures
 # gem image filepaths
@@ -22,8 +25,8 @@ kNumGems = 8 # numbber of gems allowed per bar
 kNumPreviews = 2 # number of measures ahead shown
 
 # these are just convenient
-kWindowWidth = (kNumGems * kGemWidth) + (2 * kThickness) + kLeftX + kRightX
-kWindowHeight = (kNumPreviews+1)*(kGemHeight + 2*kThickness) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
+kWindowWidth = (kNumGems * kGemWindowWidth) + (2 * kThickness) + kLeftX + kRightX
+kWindowHeight = (kNumPreviews+1)*(kGemWindowHeight + 2*kThickness) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
 
 
 # IMPORTS
@@ -43,7 +46,17 @@ from kivy.core.image import Image
 from kivy.core.window import Window
 
 # set background of screen to white
-Window.clearcolor = (1, 1, 1, 1)
+# Window.clearcolor = (1, 1, 1, 1)
+
+# set background of screen to dark dark blue
+kBgColor = (13 / 256.0, 26 / 256.0, 38 / 256.0, 0.8)
+Window.clearcolor = kBgColor
+
+kTextColor = (242 / 256.0, 242 / 256.0, 242 / 256.0, 0.9)  # Slightly off-white
+kFontPath = "../data/CevicheOne-Regular.ttf"
+
+kTitleFontSize = .8 * kTopY
+kBottomFontSize = 0.7 * kBottomY
 
 from common.gfxutil import *
 import numpy as np
@@ -53,41 +66,49 @@ import numpy as np
 # LABEL FUNCTIONS
 def title_label() :
     l = Label(text="Beat Laboratory",
-        color=(0,0,0,1),
+        # color=(0,0,0,1),
+        color=kTextColor,
         halign='center',
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
-        padding=(kRightX,kWindowHeight - kTopY*.75),
-        font_size= .5*kTopY
+        padding=(kRightX,kWindowHeight - (kTopY + kTitleFontSize) / 2),
+        font_size= kTitleFontSize,
+        font_name=kFontPath
         )
     return l
 def botleft_label() :
     l = Label(text="text",
-        color=(0,0,0,1),
+        #color=(0,0,0,1),
+        color=kTextColor,
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
-        padding=(kLeftX,kBottomY*.25),
-        font_size= .5*kBottomY
+        padding=(kLeftX,(kBottomY - kBottomFontSize) / 2),
+        font_size= kBottomFontSize,
+        font_name=kFontPath
         )
     return l
 def botright_label() :
     l = Label(text="text",
-        color=(0,0,0,1),
+        #color=(0,0,0,1),
+        color=kTextColor,
         halign='right',
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
-        padding=(kRightX,kBottomY*.25),
-        font_size= .5*kBottomY
+        padding=(kRightX,(kBottomY - kBottomFontSize) / 2),
+        font_size= kBottomFontSize,
+        font_name=kFontPath
         )
     return l
 def botmid_label() :
     l = Label(text="text",
-        color=(0,0,0,1),
+        #color=(0,0,0,1),
+        color=kTextColor,
         halign='center',
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
-        padding=(kRightX,kBottomY*.25),
-        font_size= .5*kBottomY
+        padding=(kRightX,(kBottomY - kBottomFontSize) / 2),
+        font_size= kBottomFontSize,
+        font_name=kFontPath
         )
     return l
 
@@ -97,7 +118,8 @@ def botmid_label() :
 class GemDisplay(InstructionGroup):
     def __init__(self, pos, size, beat):
         super(GemDisplay, self).__init__()
-        self.color = Color(1,1,1,mode='rgb')
+        #self.color = Color(1,1,1,mode='rgb')
+        self.color = Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba')
         #self.gem = Ellipse(pos=pos, size=size)
         path = kImages[beat]
         self.gem = Rectangle(pos=pos, size=size, texture=Image(path).texture)
@@ -110,21 +132,26 @@ class GemDisplay(InstructionGroup):
 
     # change to display this gem being hit
     def on_miss(self):
-        self.color.rgba = (1,1,1,.25)
+        #self.color.rgba = (1,1,1,.25)
+        self.color.rgba = (kTextColor[0], kTextColor[1], kTextColor[2], 0.25)
 
     # change to display this gem being hit
     def on_hit(self):
-        self.color.rgba = (1,1,1,0)
+        #self.color.rgba = (1,1,1,0)
+        self.color.rgba = (kTextColor[0], kTextColor[1], kTextColor[2], 0)
 
 
 # a rectangle border
 class BoxDisplay(InstructionGroup):
     def __init__(self, pos, size, thickness):
         super(BoxDisplay, self).__init__()
-        self.add(Color(0,0,0,1, mode='rgba'))
+        #self.add(Color(0,0,0,1, mode='rgba'))
+        self.add(Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba'))
         self.outer = Rectangle(pos=pos, size=size)
         self.add(self.outer)
-        self.add(Color(1,1,1,1, mode='rgba'))
+        #self.add(Color(1,1,1,1, mode='rgba'))
+        self.add(Color(kBgColor[0], kBgColor[1], kBgColor[2], kBgColor[3], mode='rgba'))
+        w = size[0] - 2*thickness
         w = size[0] - 2*thickness
         h = size[1] - 2*thickness
         x = pos[0] + thickness
@@ -143,7 +170,8 @@ class BoxDisplay(InstructionGroup):
 class NowbarDisplay(InstructionGroup):
     def __init__(self, x_start, x_end, y0, y1):
         super(NowbarDisplay, self).__init__()
-        self.color = Color(0,0,0,.85,mode='rgba')
+        #self.color = Color(0,0,0,.85,mode='rgba')
+        self.color = Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba')
         self.line = Line(points=(x_start, y0, x_start, y1), width=kThickness/2, cap='none')
         self.trans = Translate(0,0)
         self.trans_i = Translate(0,0)
@@ -192,8 +220,12 @@ class MeasureDisplay(InstructionGroup):
         self.gems = []
         for i in range(len(gems)):
             if gems[i] != None:
+                '''
                 x = self.current_pos[0] + float(i * self.width)/kNumGems
                 y = self.current_pos[1] + kThickness
+                '''
+                x = self.current_pos[0] + float(i * self.width)/kNumGems + (kGemWindowWidth - kGemWidth) / 2
+                y = self.current_pos[1] + kThickness + (kGemWindowHeight - kGemHeight) / 2
 
                 gd = GemDisplay(pos=np.array([x, y]), size=(kGemWidth, kGemHeight), beat=gems[i][1])
                 self.gems.append(gd)
@@ -217,8 +249,12 @@ class MeasureDisplay(InstructionGroup):
         self.moving = False
         for i in range(len(self.gems)):
             if self.gems[i] != None:
+                '''
                 x = self.current_pos[0] + float(i * self.width)/kNumGems
                 y = self.current_pos[1] + kThickness
+                '''
+                x = self.current_pos[0] + float(i * self.width)/kNumGems + (kGemWindowWidth - kGemWidth) / 2
+                y = self.current_pos[1] + kThickness + (kGemWindowHeight - kGemHeight) / 2
                 self.gems[i].set_pos(np.array([x,y]))
 
 
@@ -246,8 +282,12 @@ class MeasureDisplay(InstructionGroup):
 
             for i in range(len(self.gems)):
                 if self.gems[i] != None:
+                    '''
                     x = self.current_pos[0] + float(i * self.width)/kNumGems
                     y = self.current_pos[1] + kThickness
+                    '''
+                    x = self.current_pos[0] + float(i * self.width)/kNumGems + (kGemWindowWidth - kGemWidth) / 2
+                    y = self.current_pos[1] + kThickness + (kGemWindowHeight - kGemHeight) / 2
                     self.gems[i].set_pos(np.array([x,y]))
 
             return True
@@ -258,10 +298,10 @@ class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data, seek):
         super(BeatMatchDisplay, self).__init__()
 
-        w = kNumGems * kGemWidth + 2*kThickness
-        h = kGemHeight + 2*kThickness
+        w = kNumGems * kGemWindowWidth + 2*kThickness
+        h = kGemWindowHeight + 2*kThickness
         for i in range(kNumPreviews, -1, -1):
-            y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kThickness + kMeasureSpacing)
             self.add(BoxDisplay(pos=(kLeftX, y), size=(w,h), thickness=kThickness))
         self.nbd = NowbarDisplay(kLeftX+kThickness/2, kLeftX+w-kThickness/2, y, y+h)
         self.add(self.nbd)
@@ -307,7 +347,7 @@ class BeatMatchDisplay(InstructionGroup):
 
         # show intial graphics
         for i in range(min(kNumPreviews + 1, len(self.bars) - self.current_bar - 1)):
-            y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kThickness + kMeasureSpacing)
             self.bars[self.current_bar + i].set_pos((kLeftX, y))
             self.add(self.bars[self.current_bar + i])
 
@@ -321,7 +361,7 @@ class BeatMatchDisplay(InstructionGroup):
         self.current_bar += 1
         # move preview measures up
         for i in range(min(kNumPreviews, len(self.bars) - self.current_bar - 1)):
-            y = kBottomY + (kNumPreviews - i) * (kGemHeight + 2*kThickness + kMeasureSpacing)
+            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kThickness + kMeasureSpacing)
             self.bars[self.current_bar + i].move((kLeftX, y))
             self.measure_updates.append(self.bars[self.current_bar + i])
         # add new preview measure
