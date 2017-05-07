@@ -39,7 +39,9 @@ snapGems = True # snap gems to fraction of a barline.
 
 # audio
 kNumChannels = 2
-song_path = '../data/BeatItNoDrums' # could make command argument in future
+#song_path = '../data/BeatItNoDrums' # could make command argument in future
+song_path = '../data/24KMagicNoDrums' # could make command argument in future
+
 
 
 # MAIN WIDGET
