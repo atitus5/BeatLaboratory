@@ -30,6 +30,7 @@ class Audio(object):
         self.audio = pyaudio.PyAudio()
 
         out_dev, in_dev, buffer_size, sr = self._get_parameters()
+        self.buffer_size = buffer_size
 
         # override sample rate if needed...
         if sr:

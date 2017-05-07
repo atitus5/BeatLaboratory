@@ -13,113 +13,84 @@ sys.path.append('..')
 from common.audio import *
 
 
+kChunkSize = int(kSampleRate * 0.025)   # 25 ms
+kFFTBins = 256
+
+
 # Used to handle streaming audio input data, quantized to beats in a song, and
 # return events corresponding to beatbox events on each beat
 # NOTE: currently only accepts stereo audio (i.e. num_channels = 2)
 class MicrophoneHandler(object) :
-    def __init__(self, num_channels, max_frames, slop_frames):
+    def __init__(self, num_channels, slop_frames, mic_buf_size):
         super(MicrophoneHandler, self).__init__()
 
         assert(num_channels == 2)
 
-        # Set up audio buffers
+        # Set up audio buffer
         self.slop_frames = slop_frames
-        self.max_frames = max_frames
-        self.bufsize = self.max_frames + (2 * self.slop_frames)
+        self.mic_buf_size = mic_buf_size
+        self.buf_size = (2 * self.slop_frames) + (2 * mic_buf_size)   # Just in case it overlaps
+        self.buf = np.zeros(self.buf_size, dtype=np.float32)
+        self.buf_idx = 0
 
-        # "Last" buffer: buffer storing audio whose end slop window overlaps with the "current" buffer
-        self.last_buffer = np.zeros(self.bufsize, dtype=np.float32)
-        self.last_buffer_idx = self.slop_frames + self.max_frames   # Only end slop window
-
-        # "Current" buffer: buffer storing audio whose start slop window overlaps with the "last" buffer
-        self.current_buffer = np.zeros(self.bufsize, dtype=np.float32)
-        self.current_buffer_idx = self.slop_frames      # Ignore start slop window
+        self.processing_audio = False
 
         # Set up pre-emphasis filter coefficients
         self.s_pe = 1.0      # Output; s_pe[n]
         self.s_of = [1.0, -0.97]     # Input;  s_of[n] - 0.97s_of[n - 1] 
 
         # Set up and cache window for signal
-        self.window = hamming(self.bufsize)
+        self.window = hamming(self.buf_size)
 
-    # Receive data and send back a string indicating the event that occurred.
+    # Receive data and send back a string indicating the event that occurred, if requested.
     # Returns empty string if no event occurred
-    def add_data(self, data, record):
-        return ""
-        '''
-        add_time = time.time()
+    def add_data(self, data):
         event = ""
-        buffer_filled = self._update_buffers(data)
 
-        if buffer_filled:
-            # Extract event
-            event = self._classify_event(self.buffers[self.current_buffer], record)
+        # Start processing audio again, if we aren't already
+        self.processing_audio = True
 
-            # Move to next active buffer. Don't worry about clearing buffer,
-            # as it will be fully overwritten before being used again
-            self.current_buffer = (self.current_buffer - 1) % kBufferCount
+        # Check if we will need to classify an event
+        buffer_full = (self.buf_size - self.buf_idx) < len(data)
+        if buffer_full:
+            # Fill as much as we can, then reset index
+            self.buf[self.buf_idx:] = np.multiply(data[:self.buf_size - self.buf_idx], self.window[self.buf_idx:])
+            self.buf_idx = 0
+
+            # Classify the event now that we have a full buffer
+            event = self._classify_event()
+
+            # Clear buffer out
+            # NOTE: not strictly necessary, since it is overwritten later --- feel free
+            # to delete if performance issues arise
+            self.buf[:] = 0
+
+            # Wait until we are told again to start processing audio
+            self.processing_audio = False
+        else:
+            # Fill 'er up!
+            self.buf[self.buf_idx:self.buf_idx + len(data)] = data
+            self.buf_idx += len(data)
 
         return event
-        '''
 
-    # Takes a full buffer of windowed data and classifies it into 
-    def _classify_event(self, data, record):
+    # Takes our full buffer of windowed data and classifies it as an appropriate beatbox sound
+    def _classify_event(self):
         classification = ""
 
-        '''
         # Pre-emphasize signal (we need to recognize those snare/hi-hat fricatives!!)
-        # emphasized_audio = lfilter(self.s_of, self.s_pe, data)
+        emphasized_audio = lfilter(self.s_of, self.s_pe, self.buf)
 
-        # Take real-optimized FFT and convert to power
-        # freq_powers = abs(rfft(emphasized_audio, n=kBufferFFTBins))
-        freq_powers = abs(rfft(data, n=kBufferFFTBins))
+        # Write sentinel value to our output for beginning
+        print ",".join(map(str, [0.5 for x in xrange((kFFTBins / 2) + 1)]))
 
-        # Debounce the frequencies so we don't classify unnecessarily often
-        freq_powers_debounced = np.multiply(1.0 - (kDebounceBackoff ** self.last_classified), freq_powers)
-
-        if record:
+        # Take real-optimized FFT of each chunk and convert to power
+        for chunk in xrange(int(math.ceil(len(emphasized_audio) / float(kChunkSize)))):
+            audio_chunk = emphasized_audio[chunk * kChunkSize:(chunk + 1) * kChunkSize]
+            freq_powers = abs(rfft(audio_chunk, n=kFFTBins))
             print ",".join(map(str, freq_powers))
-        '''
+
+        # Write sentinel value to our output for end
+        print ",".join(map(str, [0.5 for x in xrange((kFFTBins / 2) + 1)]))
 
         return classification
-
-    # Update buffers in streaming fashion, windowing them in the process.
-    # Returns True if our current buffer fills and False otherwise
-    def _update_buffers(self, data):
-        return False
-        '''
-        completed_buffer = False
-
-        # First handle "real-time" buffer, as it may fill up here
-        buf_current = self.current_buffer   # Declared here locally, as it can change below
-        buf_idx = self.buffer_indices[buf_current]
-        buffer_full = (kBufferSize - buf_idx) < len(data)
-        if buffer_full:
-            # Fill as much as we can, then reset its index
-            self.buffers[buf_current][buf_idx:] = np.multiply(data[:kBufferSize - buf_idx], self.window[buf_idx:])
-            self.buffer_indices[buf_current] = 0
-            completed_buffer = True
-
-            # Fill up free one with tail of data
-            overlap = len(data) - (kBufferSize - buf_idx)
-            free_idx = buf_current - (kBufferCount - 1)
-            self.buffers[free_idx][0:overlap] = np.multiply(data[kBufferSize - buf_idx:], self.window[:overlap])
-            self.buffer_indices[free_idx] = overlap
-        else:
-            self.buffers[buf_current][buf_idx:buf_idx + len(data)] = data
-            self.buffer_indices[buf_current] += len(data)
-
-        # Now handle the delayed buffers (except the free one)
-        for i in xrange(kBufferCount - 2): 
-            # Note: these indices can be negative, but this is okay, as
-            # Python arrays can use negative indices to wrap around end
-            buf = buf_current - i - 1
-            buf_idx = self.buffer_indices[buf]
-
-            # Fill as much as we can
-            data_len = min(len(data), kBufferSize - buf_idx)
-            self.buffers[buf][buf_idx:buf_idx + data_len] = np.multiply(data[:data_len], self.window[buf_idx:buf_idx + data_len])
-            self.buffer_indices[buf] += data_len
-
-        return completed_buffer
-        '''

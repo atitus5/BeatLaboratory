@@ -11,5 +11,5 @@ if len(sys.argv) != 2:
 log_filename = sys.argv[1]
 spectrogram = pd.read_csv(log_filename).as_matrix().T
 
-plt.pcolor(spectrogram)
+plt.pcolor(spectrogram, cmap="gnuplot2")
 plt.show()

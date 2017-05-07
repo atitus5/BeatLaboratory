@@ -33,12 +33,7 @@ import numpy as np
 
 # CONSTANTS
 # gameplay
-kMicSlopWindow = 0.0
-if usemic:
-    # Give more time to process mic input, but keep regular "gameplay" slop window same
-    kMicSlopWindow = 0.010
-kGameplaySlopWindow = .100 # amount of time gem can be hit early/late
-kSlopWindow = kGameplaySlopWindow + kMicSlopWindow
+kSlopWindow = .100  # amount of time gem can be hit early/late
 kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of barline
 snapGems = True # snap gems to fraction of a barline.
 
@@ -82,13 +77,8 @@ class MainWidget(BaseWidget) :
 
         # Set up microphone input handling
         if usemic:
-            # Find biggest possible barline gap, in order to provide the mic handler with
-            # a buffer size that it can continue to reuse
-            longest_gap = max(self.bmd.bar_durations[1:]) / float(kNumGems)  # Ignore the first gap at the beginning!
-            max_frames = int(longest_gap * kSampleRate)
-            slop_frames = int(kGameplaySlopWindow * kSampleRate)
-            self.mic_handler = MicrophoneHandler(kNumChannels, max_frames, slop_frames)
-        self.recording = False
+            slop_frames = int(kSlopWindow * kSampleRate)
+            self.mic_handler = MicrophoneHandler(kNumChannels, slop_frames, self.mic_audio.buffer_size)
 
         # timekeeping
         self.clock = Clock()
@@ -106,7 +96,6 @@ class MainWidget(BaseWidget) :
             self.bg.play_toggle()
             if record:
                 self.writer.toggle()
-                self.recording = not self.recording
 
         # button down
         button_idx = lookup(keycode[1], '123', (0,1,2))
@@ -114,11 +103,8 @@ class MainWidget(BaseWidget) :
             self.player.on_button_down(button_idx)
 
     def process_mic_input(self, data, num_channels):
-        if not usemic:
-            return
-
         # Send mic input to our handler
-        event = self.mic_handler.add_data(data, self.recording)
+        event = self.mic_handler.add_data(data)
         if event:
             print event
         if event == 'kick':
@@ -135,7 +121,19 @@ class MainWidget(BaseWidget) :
         self.music_audio.on_update()
         if usemic:
             if not self.bg.paused:
-                self.mic_audio.on_update()
+                process_audio = self.mic_handler.processing_audio
+
+                # Only start processing audio if we have a gem within its slop window
+                # NOTE: this assumes our slop window is small enough to not spill into
+                # the slop windows of neighboring gems
+                if not process_audio:
+                    gems_active = self.player.next_gem < len(self.player.gem_data)
+                    gem_in_window = abs(self.player.gem_data[self.player.next_gem][0] - self.player.now) < kSlopWindow
+                    if gems_active and gem_in_window:
+                        process_audio = True
+
+                if process_audio:
+                    self.mic_audio.on_update()
         self.score_label.text = 'score: ' + str(self.player.get_score())
         self.multiplier_streak_label.text = 'x' + str(self.player.get_multiplier()) + ' (' + str(self.player.get_streak()) + ' in a row)'
 
