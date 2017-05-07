@@ -30,7 +30,7 @@ kAnimDur = .25 # number of seconds animations take
 
 # graphics that indirectly affect gameplay
 kNumGems = 8 # numbber of gems allowed per bar
-kNumPreviews = 2 # number of measures ahead shown
+kNumPreviews = 1 # number of measures ahead shown
 kPreviewScale = 2*3**-1 # previews are this fraction of full size (<= 1)
 
 # these are just convenient
@@ -127,6 +127,7 @@ class GemDisplay(InstructionGroup):
         self.target_pos = pos
         self.target_size = size
         self.time = 0
+        self.animDur = kAnimDur
         self.animating = False
 
     # immediately change the gem's position without animating
@@ -140,11 +141,12 @@ class GemDisplay(InstructionGroup):
         self.size = size
         self.target_size = size
 
-    def transform(self, pos, size):
+    def transform(self, pos, size, animDur = kAnimDur):
         self.target_pos = pos
         self.target_size = size
         self.time = 0
         self.animating = True
+        self.animDur = animDur
 
     # change to display this gem being hit
     def on_miss(self):
@@ -158,16 +160,16 @@ class GemDisplay(InstructionGroup):
     def on_update(self, dt):
         if self.animating:
             self.time += dt
-            if self.time > kAnimDur:
-                self.time = kAnimDur
-            progress = (self.time * kAnimDur**-1)
+            if self.time > self.animDur:
+                self.time = self.animDur
+            progress = (self.time * self.animDur**-1)
             x = progress * (self.target_pos[0] - self.pos[0]) + self.pos[0]
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
             self.gem.pos = (x,y)
             self.gem.size = (w,h)
-            if self.time == kAnimDur:
+            if self.time == self.animDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
                 self.animating = False
@@ -259,7 +261,7 @@ class MeasureDisplay(InstructionGroup):
         self.animating = []
 
     # update position and size with animation
-    def transform(self, pos, size):
+    def transform(self, pos, size, animDur=kAnimDur):
         self.size = size
         self.animating = []
         for i in range(len(self.gems)):
@@ -268,7 +270,7 @@ class MeasureDisplay(InstructionGroup):
                 y = pos[1]
                 w = int((size[0])*len(self.gems)**-1)
                 h = size[1]
-                self.gems[i].transform((x,y),(w,h))
+                self.gems[i].transform((x,y),(w,h), animDur)
                 self.animating.append(self.gems[i])
 
     # immediately update position without animating
@@ -312,19 +314,20 @@ class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data, seek):
         super(BeatMatchDisplay, self).__init__()
 
-        w = kNumGems * kGemWidth + 2*kBoxThickness
-        h = kGemHeight + 2*kBoxThickness
-        pre_w = int(kPreviewScale * kNumGems * kGemWidth) + 2*kBoxThickness
-        pre_h = int(kPreviewScale * kGemHeight) + 2*kBoxThickness
-        preLeftX = kLeftX + (1-kPreviewScale) * w * .5
+        act_w = kNumGems * kGemWidth
+        act_h = kGemHeight
+        pre_w = kPreviewScale * kNumGems * kGemWidth
+        pre_h = kPreviewScale * kGemHeight
+        preLeftX = kLeftX + (1-kPreviewScale) * act_w * .5
         # previews
-        for i in range(1, kNumPreviews+1):
-            y = kBottomY + (kNumPreviews - i) * (pre_h + kMeasureSpacing)
-            self.add(BoxDisplay(pos=(preLeftX, y), size=(pre_w,pre_h), thickness=int(kBoxThickness*kPreviewScale)))
-        # box and nowbar for active measure
-        y = kBottomY + kNumPreviews * (pre_h + kMeasureSpacing)
-        self.add(BoxDisplay(pos=(kLeftX, y), size=(w,h), thickness=kBoxThickness))
-        self.nbd = NowbarDisplay(kLeftX+kBoxThickness/2, kLeftX+w-kBoxThickness/2, y, y+h)
+        for i in range(kNumPreviews, -1, -1):
+            y = kBottomY + (kNumPreviews - i) * (pre_h + kMeasureSpacing + 2*kBoxThickness)
+            x = (kLeftX if i==0 else preLeftX)
+            w = (act_w if i==0 else pre_w) + 2*kBoxThickness
+            h = (act_h if i==0 else pre_h) + 2*kBoxThickness
+            self.add(BoxDisplay(pos=(x, y), size=(w,h), thickness=kBoxThickness))
+        # nowbar for active measure (i = 0 right now)
+        self.nbd = NowbarDisplay(kLeftX+kBoxThickness/2, kLeftX+act_w+kBoxThickness/2, y, y+h)
         self.add(self.nbd)
 
         # tracks which measures are animating
@@ -334,11 +337,6 @@ class BeatMatchDisplay(InstructionGroup):
         self.bars = []
         self.bar_durations = []
         self.bar_num_gems = []
-        act_w = kNumGems * kGemWidth
-        act_h = kGemHeight
-        pre_w = int(kPreviewScale * kNumGems * kGemWidth)
-        pre_h = int(kPreviewScale * kGemHeight)
-        preLeftX = kLeftX + (1-kPreviewScale) * act_w * .5
         i = 1
         j = 0
         while i < len(song_data.barlines):
@@ -377,7 +375,7 @@ class BeatMatchDisplay(InstructionGroup):
 
         # show intial graphics
         for i in range(min(kNumPreviews + 1, len(self.bars) - self.current_bar - 1)):
-            x = (kLeftX if i==0 else preLeftX) + kBoxThickness
+            x = (kLeftX if i==0 else preLeftX) + 2*kBoxThickness
             y = kBottomY + (kNumPreviews - i) * (pre_h + 2*kBoxThickness + kMeasureSpacing) + kBoxThickness
             w = act_w if i == 0 else pre_w
             h = act_h if i == 0 else pre_h
@@ -392,19 +390,20 @@ class BeatMatchDisplay(InstructionGroup):
         self.remove(self.bars[self.current_bar])
         # update current measure
         self.gem_offset += self.bar_num_gems[self.current_bar]
+        animDur = self.bar_durations[self.current_bar]*(2*kNumGems)**-1
         self.current_bar += 1
         # move preview measures up
         act_w = kNumGems * kGemWidth
         act_h = kGemHeight
-        pre_w = int(kPreviewScale * kNumGems * kGemWidth)
-        pre_h = int(kPreviewScale * kGemHeight)
+        pre_w = kPreviewScale * kNumGems * kGemWidth
+        pre_h = kPreviewScale * kGemHeight
         preLeftX = kLeftX + (1-kPreviewScale) * act_w * .5
         for i in range(min(kNumPreviews+1, len(self.bars) - self.current_bar - 1)):
             x = (kLeftX if i == 0 else preLeftX) + kBoxThickness
             y = kBottomY + (kNumPreviews - i) * (pre_h + 2*kBoxThickness + kMeasureSpacing) + kBoxThickness
             w = act_w if i == 0 else pre_w
             h = act_h if i == 0 else pre_h
-            self.bars[self.current_bar + i].transform((x, y), (w,h))
+            self.bars[self.current_bar + i].transform((x, y), (w,h), animDur)
             self.measure_updates.append(self.bars[self.current_bar + i])
         # add new preview measure
         if self.current_bar + kNumPreviews < len(self.bars):
