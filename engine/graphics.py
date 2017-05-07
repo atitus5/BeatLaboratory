@@ -11,7 +11,7 @@ kGemWindowWidth = 150
 kGemWindowHeight = kGemWindowWidth  # (leave square since we are using images)
 kGemWidth = 100
 kGemHeight = kGemWidth
-kThickness = 5 # thickness of bar (>= 2)
+kBoxThickness = 5 # thickness of bar (>= 2)
 kMeasureSpacing = 20 # vertical space between measures
 # gem image filepaths
 kImages = [
@@ -19,14 +19,16 @@ kImages = [
     '../data/hihat.png',
     '../data/snare.png'
 ]
+kBeatlineThickness = 2
+kNowbarThickness = 3
 
 # graphics that indirectly affect gameplay
 kNumGems = 8 # numbber of gems allowed per bar
 kNumPreviews = 2 # number of measures ahead shown
 
 # these are just convenient
-kWindowWidth = (kNumGems * kGemWindowWidth) + (2 * kThickness) + kLeftX + kRightX
-kWindowHeight = (kNumPreviews+1)*(kGemWindowHeight + 2*kThickness) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
+kWindowWidth = (kNumGems * kGemWindowWidth) + (2 * kBoxThickness) + kLeftX + kRightX
+kWindowHeight = (kNumPreviews+1)*(kGemWindowHeight + 2*kBoxThickness) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
 
 
 # IMPORTS
@@ -45,15 +47,14 @@ from kivy.clock import Clock as kivyClock
 from kivy.core.image import Image
 from kivy.core.window import Window
 
-# set background of screen to white
-# Window.clearcolor = (1, 1, 1, 1)
-
 # set background of screen to dark dark blue
 kBgColor = (13 / 256.0, 26 / 256.0, 38 / 256.0, 0.8)
 Window.clearcolor = kBgColor
 
 kTextColor = (242 / 256.0, 242 / 256.0, 242 / 256.0, 0.9)  # Slightly off-white
 kFontPath = "../data/CevicheOne-Regular.ttf"
+
+kBeatlineColor = (1,1,1,.5)
 
 kTitleFontSize = .8 * kTopY
 kBottomFontSize = 0.7 * kBottomY
@@ -145,13 +146,10 @@ class GemDisplay(InstructionGroup):
 class BoxDisplay(InstructionGroup):
     def __init__(self, pos, size, thickness):
         super(BoxDisplay, self).__init__()
-        #self.add(Color(0,0,0,1, mode='rgba'))
         self.add(Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba'))
         self.outer = Rectangle(pos=pos, size=size)
         self.add(self.outer)
-        #self.add(Color(1,1,1,1, mode='rgba'))
         self.add(Color(kBgColor[0], kBgColor[1], kBgColor[2], kBgColor[3], mode='rgba'))
-        w = size[0] - 2*thickness
         w = size[0] - 2*thickness
         h = size[1] - 2*thickness
         x = pos[0] + thickness
@@ -159,20 +157,27 @@ class BoxDisplay(InstructionGroup):
         self.thickness = thickness
         self.inner = Rectangle(pos=(x, y), size=(w,h))
         self.add(self.inner)
+        for i in range(kNumGems):
+            self.add(BeatlineDisplay((x+(i+.5)*kNumGems**-1*w,y), h))
 
-    # change the box's position
-    def set_pos(self, pos):
-        self.outer.pos = pos
-        self.inner.pos = [pos[0] + self.thickness, pos[1] + self.thickness]
+
+
+# displays a vertical line starting at pos and going up for length
+class BeatlineDisplay(InstructionGroup):
+    def __init__(self, pos, length):
+        super(BeatlineDisplay, self).__init__()
+        self.length = length
+        self.add(Color(kBeatlineColor[0], kBeatlineColor[1], kBeatlineColor[2], kBeatlineColor[3], mode='rgba'))
+        self.line = Line(points=(pos[0], pos[1], pos[0], pos[1] + self.length), width=kBeatlineThickness, cap='none')
+        self.add(self.line)
 
 
 # a vertical line which can move linearly between two x positions
 class NowbarDisplay(InstructionGroup):
     def __init__(self, x_start, x_end, y0, y1):
         super(NowbarDisplay, self).__init__()
-        #self.color = Color(0,0,0,.85,mode='rgba')
         self.color = Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba')
-        self.line = Line(points=(x_start, y0, x_start, y1), width=kThickness/2, cap='none')
+        self.line = Line(points=(x_start, y0, x_start, y1), width=kNowbarThickness, cap='none')
         self.trans = Translate(0,0)
         self.trans_i = Translate(0,0)
         self.add(self.trans)
@@ -222,10 +227,10 @@ class MeasureDisplay(InstructionGroup):
             if gems[i] != None:
                 '''
                 x = self.current_pos[0] + float(i * self.width)/kNumGems
-                y = self.current_pos[1] + kThickness
+                y = self.current_pos[1] + kBoxThickness
                 '''
                 x = self.current_pos[0] + float(i * self.width)/kNumGems + (kGemWindowWidth - kGemWidth) / 2
-                y = self.current_pos[1] + kThickness + (kGemWindowHeight - kGemHeight) / 2
+                y = self.current_pos[1] + kBoxThickness + (kGemWindowHeight - kGemHeight) / 2
 
                 gd = GemDisplay(pos=np.array([x, y]), size=(kGemWidth, kGemHeight), beat=gems[i][1])
                 self.gems.append(gd)
@@ -251,10 +256,10 @@ class MeasureDisplay(InstructionGroup):
             if self.gems[i] != None:
                 '''
                 x = self.current_pos[0] + float(i * self.width)/kNumGems
-                y = self.current_pos[1] + kThickness
+                y = self.current_pos[1] + kBoxThickness
                 '''
                 x = self.current_pos[0] + float(i * self.width)/kNumGems + (kGemWindowWidth - kGemWidth) / 2
-                y = self.current_pos[1] + kThickness + (kGemWindowHeight - kGemHeight) / 2
+                y = self.current_pos[1] + kBoxThickness + (kGemWindowHeight - kGemHeight) / 2
                 self.gems[i].set_pos(np.array([x,y]))
 
 
@@ -284,10 +289,10 @@ class MeasureDisplay(InstructionGroup):
                 if self.gems[i] != None:
                     '''
                     x = self.current_pos[0] + float(i * self.width)/kNumGems
-                    y = self.current_pos[1] + kThickness
+                    y = self.current_pos[1] + kBoxThickness
                     '''
                     x = self.current_pos[0] + float(i * self.width)/kNumGems + (kGemWindowWidth - kGemWidth) / 2
-                    y = self.current_pos[1] + kThickness + (kGemWindowHeight - kGemHeight) / 2
+                    y = self.current_pos[1] + kBoxThickness + (kGemWindowHeight - kGemHeight) / 2
                     self.gems[i].set_pos(np.array([x,y]))
 
             return True
@@ -298,12 +303,12 @@ class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data, seek):
         super(BeatMatchDisplay, self).__init__()
 
-        w = kNumGems * kGemWindowWidth + 2*kThickness
-        h = kGemWindowHeight + 2*kThickness
+        w = kNumGems * kGemWindowWidth + 2*kBoxThickness
+        h = kGemWindowHeight + 2*kBoxThickness
         for i in range(kNumPreviews, -1, -1):
-            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kThickness + kMeasureSpacing)
-            self.add(BoxDisplay(pos=(kLeftX, y), size=(w,h), thickness=kThickness))
-        self.nbd = NowbarDisplay(kLeftX+kThickness/2, kLeftX+w-kThickness/2, y, y+h)
+            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kBoxThickness + kMeasureSpacing)
+            self.add(BoxDisplay(pos=(kLeftX, y), size=(w,h), thickness=kBoxThickness))
+        self.nbd = NowbarDisplay(kLeftX+kBoxThickness/2, kLeftX+w-kBoxThickness/2, y, y+h)
         self.add(self.nbd)
 
         self.measure_updates = []
@@ -347,7 +352,7 @@ class BeatMatchDisplay(InstructionGroup):
 
         # show intial graphics
         for i in range(min(kNumPreviews + 1, len(self.bars) - self.current_bar - 1)):
-            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kThickness + kMeasureSpacing)
+            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kBoxThickness + kMeasureSpacing)
             self.bars[self.current_bar + i].set_pos((kLeftX, y))
             self.add(self.bars[self.current_bar + i])
 
@@ -361,7 +366,7 @@ class BeatMatchDisplay(InstructionGroup):
         self.current_bar += 1
         # move preview measures up
         for i in range(min(kNumPreviews, len(self.bars) - self.current_bar - 1)):
-            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kThickness + kMeasureSpacing)
+            y = kBottomY + (kNumPreviews - i) * (kGemWindowHeight + 2*kBoxThickness + kMeasureSpacing)
             self.bars[self.current_bar + i].move((kLeftX, y))
             self.measure_updates.append(self.bars[self.current_bar + i])
         # add new preview measure
