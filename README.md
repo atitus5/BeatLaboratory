@@ -10,4 +10,7 @@ To play:
 `./play.sh`
 
 Image Credit
-kick, snare: Artem Kovyazin
+kick, snare, hihat: Artem Kovyazin
+
+Font Credit
+CevicheOne: Miguel Hernandez; downloaded from Google Fonts
