@@ -13,51 +13,40 @@ sys.path.append('..')
 from common.audio import *
 
 
-# Buffering concept: maintain N buffers, where (N-1) are active
-# and one is "free" for overflow when a buffer fills. The "real-time"
-# buffer is updated with the newest data while the delayed buffers
-# are updated with delayed data. The "real-time" buffer rotates regularly.
-kBufferTime = 0.100     # 100 ms
-kBufferShift = 0.010    # 10 ms
-kBufferSize = int(kSampleRate * kBufferTime)
-kBufferSpacing = int(kSampleRate * kBufferShift)
-kBufferCount = int(math.ceil(kBufferSize / float(kBufferSpacing))) + 1
-
-kBufferFFTBins = 512
-
-# Experimentally determined constants
-kDebounceBackoff = 0.98     # Used to prevent multiple classifications in a row
-
-# Used to handle streaming audio input data and return events corresponding
-# to beatbox events
+# Used to handle streaming audio input data, quantized to beats in a song, and
+# return events corresponding to beatbox events on each beat
 # NOTE: currently only accepts stereo audio (i.e. num_channels = 2)
 class MicrophoneHandler(object) :
-    def __init__(self, num_channels):
+    def __init__(self, num_channels, max_frames, slop_frames):
         super(MicrophoneHandler, self).__init__()
 
         assert(num_channels == 2)
 
         # Set up audio buffers
-        self.buffers = np.zeros((kBufferCount, kBufferSize), dtype=np.float32)
-        self.buffer_indices = np.zeros(kBufferCount, dtype=np.int)
-        self.current_buffer = kBufferCount - 1  # Track which buffer is currently "real-time"; starts at end
-        for i in xrange(kBufferCount - 1):
-            # Fill in previous buffers, except the first one which is still unused
-            self.buffer_indices[i + 1] = i * kBufferSpacing
+        self.slop_frames = slop_frames
+        self.max_frames = max_frames
+        self.bufsize = self.max_frames + (2 * self.slop_frames)
+
+        # "Last" buffer: buffer storing audio whose end slop window overlaps with the "current" buffer
+        self.last_buffer = np.zeros(self.bufsize, dtype=np.float32)
+        self.last_buffer_idx = self.slop_frames + self.max_frames   # Only end slop window
+
+        # "Current" buffer: buffer storing audio whose start slop window overlaps with the "last" buffer
+        self.current_buffer = np.zeros(self.bufsize, dtype=np.float32)
+        self.current_buffer_idx = self.slop_frames      # Ignore start slop window
 
         # Set up pre-emphasis filter coefficients
         self.s_pe = 1.0      # Output; s_pe[n]
         self.s_of = [1.0, -0.97]     # Input;  s_of[n] - 0.97s_of[n - 1] 
 
         # Set up and cache window for signal
-        self.window = hamming(kBufferSize)
-
-        # Track last time we classified, so we can debounce the signal
-        self.last_classified = 1024     # Arbitrarily high number so that we start off with no debouncing
+        self.window = hamming(self.bufsize)
 
     # Receive data and send back a string indicating the event that occurred.
     # Returns empty string if no event occurred
     def add_data(self, data, record):
+        return ""
+        '''
         add_time = time.time()
         event = ""
         buffer_filled = self._update_buffers(data)
@@ -71,11 +60,13 @@ class MicrophoneHandler(object) :
             self.current_buffer = (self.current_buffer - 1) % kBufferCount
 
         return event
+        '''
 
     # Takes a full buffer of windowed data and classifies it into 
     def _classify_event(self, data, record):
         classification = ""
 
+        '''
         # Pre-emphasize signal (we need to recognize those snare/hi-hat fricatives!!)
         # emphasized_audio = lfilter(self.s_of, self.s_pe, data)
 
@@ -88,12 +79,15 @@ class MicrophoneHandler(object) :
 
         if record:
             print ",".join(map(str, freq_powers))
+        '''
 
         return classification
 
     # Update buffers in streaming fashion, windowing them in the process.
     # Returns True if our current buffer fills and False otherwise
     def _update_buffers(self, data):
+        return False
+        '''
         completed_buffer = False
 
         # First handle "real-time" buffer, as it may fill up here
@@ -128,3 +122,4 @@ class MicrophoneHandler(object) :
             self.buffer_indices[buf] += data_len
 
         return completed_buffer
+        '''

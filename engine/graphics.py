@@ -57,6 +57,15 @@ from kivy.core.window import Window
 # set background of screen
 Window.clearcolor = kBgColor
 
+kTitleColor = (51 / 256.0, 153 / 256.0, 51 / 256.0, 0.9)  # Green
+kTextColor = (242 / 256.0, 242 / 256.0, 242 / 256.0, 0.9)  # Slightly off-white
+kFontPath = "../data/CevicheOne-Regular.ttf"
+
+kBeatlineColor = (1,1,1,.5)
+
+kTitleFontSize = 0.9 * kTopY
+kTopFontSize = 0.6 * kTopY
+
 from common.gfxutil import *
 import numpy as np
 
@@ -66,7 +75,7 @@ import numpy as np
 def title_label() :
     l = Label(text="Beat Laboratory",
         # color=(0,0,0,1),
-        color=kTextColor,
+        color=kTitleColor,
         halign='center',
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
@@ -75,38 +84,26 @@ def title_label() :
         font_name=kFontPath
         )
     return l
-def botleft_label() :
+def topleft_label() :
     l = Label(text="text",
         #color=(0,0,0,1),
         color=kTextColor,
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
-        padding=(kLeftX,(kBottomY - kBottomFontSize) / 2),
-        font_size= kBottomFontSize,
+        padding=(kLeftX,kWindowHeight - (kTopY + kTopFontSize) / 2),
+        font_size= kTopFontSize,
         font_name=kFontPath
         )
     return l
-def botright_label() :
+def topright_label() :
     l = Label(text="text",
         #color=(0,0,0,1),
         color=kTextColor,
         halign='right',
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
-        padding=(kRightX,(kBottomY - kBottomFontSize) / 2),
-        font_size= kBottomFontSize,
-        font_name=kFontPath
-        )
-    return l
-def botmid_label() :
-    l = Label(text="text",
-        #color=(0,0,0,1),
-        color=kTextColor,
-        halign='center',
-        size=(kWindowWidth, kWindowHeight),
-        text_size=(kWindowWidth, kWindowHeight),
-        padding=(kRightX,(kBottomY - kBottomFontSize) / 2),
-        font_size= kBottomFontSize,
+        padding=(kRightX,kWindowHeight - (kTopY + kTopFontSize) / 2),
+        font_size= kTopFontSize,
         font_name=kFontPath
         )
     return l
@@ -195,7 +192,8 @@ class BoxDisplay(InstructionGroup):
         self.inner = Rectangle(pos=(x, y), size=(w,h))
         self.add(self.inner)
         for i in range(kNumGems):
-            self.add(BeatlineDisplay((x+(i+.5)*kNumGems**-1*w,y), h))
+            current_x = x + (i + 0.5) * kNumGems ** -1 * w
+            self.add(BeatlineDisplay((current_x, y), h))
 
 
 
