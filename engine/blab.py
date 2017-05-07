@@ -33,7 +33,12 @@ import numpy as np
 
 # CONSTANTS
 # gameplay
-kSlopWindow = .20 # amount of time gem can be hit early/late (more generous for mic)
+kMicSlopWindow = 0.0
+if usemic:
+    # Give more time to process mic input, but keep regular "gameplay" slop window same
+    kMicSlopWindow = 0.010
+kGameplaySlopWindow = .100 # amount of time gem can be hit early/late
+kSlopWindow = kGameplaySlopWindow + kMicSlopWindow
 kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of barline
 snapGems = True # snap gems to fraction of a barline.
 
@@ -63,23 +68,27 @@ class MainWidget(BaseWidget) :
         self.song_data = SongData()
         self.song_data.read_data(song_path+'_gems.txt', song_path+'_barlines.txt')
 
-        # Set up microphone input handling
-        if usemic:
-            self.mic_handler = MicrophoneHandler(kNumChannels)
-
         # game text
-        self.score_label = botleft_label()
+        self.score_label = topleft_label()
         self.add_widget(self.score_label)
-        self.streak_label = botright_label()
-        self.add_widget(self.streak_label)
-        self.multiplier_label = botmid_label()
-        self.add_widget(self.multiplier_label)
+        self.multiplier_streak_label = topright_label()
+        self.add_widget(self.multiplier_streak_label)
         # static title label
         self.add_widget(title_label())
 
         # graphics
         self.bmd = BeatMatchDisplay(self.song_data, seek)
         self.canvas.add(self.bmd)
+
+        # Set up microphone input handling
+        if usemic:
+            # Find biggest possible barline gap, in order to provide the mic handler with
+            # a buffer size that it can continue to reuse
+            longest_gap = max(self.bmd.bar_durations[1:]) / float(kNumGems)  # Ignore the first gap at the beginning!
+            max_frames = int(longest_gap * kSampleRate)
+            slop_frames = int(kGameplaySlopWindow * kSampleRate)
+            self.mic_handler = MicrophoneHandler(kNumChannels, max_frames, slop_frames)
+        self.recording = False
 
         # timekeeping
         self.clock = Clock()
@@ -97,6 +106,7 @@ class MainWidget(BaseWidget) :
             self.bg.play_toggle()
             if record:
                 self.writer.toggle()
+                self.recording = not self.recording
 
         # button down
         button_idx = lookup(keycode[1], '123', (0,1,2))
@@ -106,8 +116,11 @@ class MainWidget(BaseWidget) :
     def process_mic_input(self, data, num_channels):
         if not usemic:
             return
+
         # Send mic input to our handler
-        event = self.mic_handler.add_data(data)
+        event = self.mic_handler.add_data(data, self.recording)
+        if event:
+            print event
         if event == 'kick':
             self.player.on_button_down(0)
         elif event == 'hihat':
@@ -121,10 +134,10 @@ class MainWidget(BaseWidget) :
         self.player.on_update(dt)
         self.music_audio.on_update()
         if usemic:
-            self.mic_audio.on_update()
+            if not self.bg.paused:
+                self.mic_audio.on_update()
         self.score_label.text = 'score: ' + str(self.player.get_score())
-        self.streak_label.text = str(self.player.get_streak()) + ' in a row'
-        self.multiplier_label.text = 'x' + str(self.player.get_multiplier())
+        self.multiplier_streak_label.text = 'x' + str(self.player.get_multiplier()) + ' (' + str(self.player.get_streak()) + ' in a row)'
 
 
 # PARSE DATA (gems & barlines)
