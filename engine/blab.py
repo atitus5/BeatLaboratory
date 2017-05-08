@@ -5,9 +5,9 @@ import sys
 sys.path.append('..')
 
 # command line args
-seek = 0.0
+kSeek = 0.0
 if len(sys.argv) >= 2:
-    seek = float(sys.argv[1])
+    kSeek = float(sys.argv[1])
 usemic = True
 record = False
 if len(sys.argv) >= 3:
@@ -30,6 +30,7 @@ from common.writer import *
 
 # other
 import numpy as np
+import time
 
 # CONSTANTS
 # gameplay
@@ -59,7 +60,7 @@ class MainWidget(BaseWidget) :
         self.music_audio.set_generator(self.mixer)
         self.bg = WaveGenerator(WaveFile(song_path + '_bg.wav'))
         self.bg.pause()
-        self.bg.frame = int(seek * Audio.sample_rate)
+        self.bg.frame = int(kSeek * Audio.sample_rate)
         self.mixer.add(self.bg)
         self.song_data = SongData()
         self.song_data.read_data(song_path+'_gems.txt', song_path+'_barlines.txt')
@@ -120,7 +121,7 @@ class MainWidget(BaseWidget) :
         self.bmd.install_particle_systems(self)
 
         # gameplay
-        self.player = Player(self.train_song_data.gems, self.bmd)
+        self.player = Player(self.train_song_data.gems, self.bmd, 0)
 
         # Start the training track
         self.clock.start()
@@ -130,8 +131,8 @@ class MainWidget(BaseWidget) :
 
         # Fix clock
         self.clock.stop()
-        self.now = seek
-        self.clock.set_time(seek)
+        self.now = kSeek
+        self.clock.set_time(kSeek)
 
         if self.bmd is not None:
             self.canvas.remove(self.bmd)
@@ -139,12 +140,12 @@ class MainWidget(BaseWidget) :
         self.training = False
 
         # graphics
-        self.bmd = BeatMatchDisplay(self.song_data, seek)
+        self.bmd = BeatMatchDisplay(self.song_data, kSeek)
         self.canvas.add(self.bmd)
         self.bmd.install_particle_systems(self)
 
         # gameplay
-        self.player = Player(self.song_data.gems, self.bmd)
+        self.player = Player(self.song_data.gems, self.bmd, kSeek)
 
 
     def on_key_down(self, keycode, modifiers):
@@ -163,8 +164,7 @@ class MainWidget(BaseWidget) :
     def process_mic_input(self, data, num_channels):
         # Send mic input to our handler
         if self.training:
-            # self.mic_handler.add_training_data(data, self.current_label)
-            pass
+            self.mic_handler.add_training_data(data, self.current_label)
         else:
             event = self.mic_handler.add_data(data)
             if event:
@@ -194,7 +194,9 @@ class MainWidget(BaseWidget) :
                 if self.training:
                     if self.player.next_gem >= len(self.player.gem_data):
                         if self.train_popup is None:
-                            # We're done! Display another popup
+                            # We're done! Train the classifier, then display another popup
+                            self.mic_handler.train_classifier()
+
                             self.train_popup = Popup(title="You're ready to go!",
                                                     content=Label(text="You're all ready to play!\n" + 
                                                                   "\nSimply press anywhere outside of this box to begin."),
@@ -240,7 +242,7 @@ class SongData(object):
             gems_data.sort()
             # handle multiple button gems (make a gem for each one)
             for g in gems_data:
-                self.gems.append((float(g[0]), (int(g[1][-1])-1)))
+                self.gems.append((float(g[0]), (int(g[1])-1)))
             self.gems.sort()
 
         # read barline file
@@ -272,7 +274,7 @@ class SongData(object):
 # Handles game logic and keeps score.
 # Controls the display and the audio
 class Player(object):
-    def __init__(self, gem_data, display):
+    def __init__(self, gem_data, display, seek):
         super(Player, self).__init__()
         self.gem_data = gem_data
         self.display = display
