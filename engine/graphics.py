@@ -34,7 +34,7 @@ kHitAnimDur = .5 # number of seconds hit animations take
 
 # graphics that indirectly affect gameplay
 kNumGems = 8 # numbber of gems allowed per bar
-kPreviews = np.array([2**i*3**-i for i in range(1,7)])
+kPreviews = np.array([2**i*3**-i for i in range(1,4)])
 
 # these are just convenient
 kMeasureWidth = kNumGems * kGemWidth
