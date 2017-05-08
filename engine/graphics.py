@@ -63,6 +63,8 @@ from kivy.graphics import PushMatrix, PopMatrix, Translate, Scale, Rotate
 from kivy.clock import Clock as kivyClock
 from kivy.core.image import Image
 from kivy.core.window import Window
+from kivy.uix.popup import Popup
+
 from common.kivyparticle import ParticleSystem
 
 # set background of screen
@@ -119,6 +121,10 @@ def topright_label() :
     return l
 
 
+# MENUS AND POPUPS
+# TODO
+
+
 #KIVY INSTRUCTION GROUPS
 # displays a circle with a color depending on beat type
 class GemDisplay(InstructionGroup):
@@ -127,10 +133,14 @@ class GemDisplay(InstructionGroup):
         #self.color = Color(1,1,1,mode='rgb')
         self.color = Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba')
         #self.gem = Ellipse(pos=pos, size=size)
-        path = kImages[beat]
-        self.gem = Rectangle(pos=pos, size=size, texture=Image(path).texture)
-        self.add(self.color)
-        self.add(self.gem)
+
+        self.gem = None
+        if beat < len(kImages):
+            # We do this because we may want "silence" gems for training, with no image
+            path = kImages[beat]
+            self.gem = Rectangle(pos=pos, size=size, texture=Image(path).texture)
+            self.add(self.color)
+            self.add(self.gem)
 
         self.pos = pos
         self.size = size
@@ -151,12 +161,14 @@ class GemDisplay(InstructionGroup):
 
     # immediately change the gem's position without animating
     def set_pos(self, pos):
-        self.gem.pos = pos
+        if self.gem is not None:
+            self.gem.pos = pos
         self.pos = pos
         self.target_pos = pos
 
     def set_size(self, size):
-        self.gem.size = size
+        if self.gem is not None:
+            self.gem.size = size
         self.size = size
         self.target_size = size
 
@@ -190,9 +202,12 @@ class GemDisplay(InstructionGroup):
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
-            self.gem.pos = (x,y)
-            self.gem.size = (w,h)
-            if self.shift_time == self.animDur:
+
+            if self.gem is not None:
+                self.gem.pos = (x,y)
+                self.gem.size = (w,h)
+
+            if self.shift_time == kAnimDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
                 self.shift_animating = False
@@ -208,7 +223,7 @@ class GemDisplay(InstructionGroup):
 
                 self.gem.size = (w, h)
                 self.color.a = alpha
-                
+
                 return True
 
         return False
@@ -354,33 +369,57 @@ class MeasureDisplay(InstructionGroup):
 class HitParticleDisplay(InstructionGroup):
     def __init__(self, pos, size):
         super(HitParticleDisplay, self).__init__()
-        self.psystems = []
-        self.hit_times = [-1]
+        # particle systems on active measure
+        self.m_psystems = []
+        self.m_hit_times = [-1]
         for i in range(kNumGems):
-            ps = ParticleSystem('../particle/particle.pex')
+            ps = ParticleSystem('../particle/particle1.pex')
             ps.emitter_x = pos[0] + (i + 0.5) * kNumGems ** -1 * size[0]
             ps.emitter_y = pos[1] + .5*size[1]
-            self.psystems.append(ps)
-            self.hit_times.append(-1)
+            self.m_psystems.append(ps)
+            self.m_hit_times.append(-1)
+
+        # particle systems on bottom corners of screen
+        self.bl = ParticleSystem('../particle/particle2.pex')
+        self.bl.emitter_x = 0
+        self.bl.emitter_y = 0
+        self.bl.emit_angle = np.pi*4**-1
+        self.br = ParticleSystem('../particle/particle2.pex')
+        self.br.emitter_x = kWindowWidth-1
+        self.br.emitter_y = 0
+        self.br.emit_angle = 3*np.pi*4**-1
+        self.b_hit_time = -1
+
 
     def puff(self, i):
-        if i < 0 or i > len(self.psystems):
+        if i < 0 or i > len(self.m_psystems):
             print "warning: ps puff out of bounds"
             return
-        self.psystems[i].start()
-        self.hit_times[i] = 0
+        self.m_psystems[i].start()
+        self.m_hit_times[i] = 0
+        self.bl.start()
+        self.br.start()
+        self.b_hit_time = 0
 
     def install_particle_systems(self, widget):
-        for ps in self.psystems:
+        for ps in self.m_psystems:
             widget.add_widget(ps)
+        widget.add_widget(self.bl)
+        widget.add_widget(self.br)
 
     def on_update(self, dt):
-        for i in range(len(self.hit_times)):
-            if self.hit_times[i] >= 0:
-                self.hit_times[i] += dt
-            if self.hit_times[i] >= kHitAnimDur:
-                self.hit_times[i] = -1
-                self.psystems[i].stop()
+        for i in range(len(self.m_hit_times)):
+            if self.m_hit_times[i] >= 0:
+                self.m_hit_times[i] += dt
+            if self.m_hit_times[i] >= kHitAnimDur:
+                self.m_hit_times[i] = -1
+                self.m_psystems[i].stop()
+        if self.b_hit_time >= 0:
+            self.b_hit_time += dt
+        if self.b_hit_time >= kHitAnimDur:
+            self.b_hit_time = -1
+            self.bl.stop()
+            self.br.stop()
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
@@ -509,6 +548,9 @@ class BeatMatchDisplay(InstructionGroup):
         if self.bar_dur >= (2*kNumGems-1)*(2*kNumGems)**-1 * self.bar_durations[self.current_bar]:
             self.bar_dur -= self.bar_durations[self.current_bar]
             self.__update_display()
+
+        if self.current_bar >= len(self.bar_durations):
+            return
 
         progress = self.bar_dur * self.bar_durations[self.current_bar]**-1
         progress += (2*kNumGems)**-1 # nowbar goes in middle of gem on exact hit, not front
