@@ -93,6 +93,7 @@ class MainWidget(BaseWidget) :
             self.mic_handler = MicrophoneHandler(1, slop_frames, self.mic_audio.buffer_size)
 
             self.training = True
+            self.current_label = None   # Will be set before it is used, no problemos
             self.train_popup = Popup(title="Welcome to BeatLaboratory!",
                                     content=Label(text="Welcome to BeatLaboratory! Because everyone has\n" +
                                                   "their own beatboxing style, we need to learn more\n" +
@@ -159,15 +160,19 @@ class MainWidget(BaseWidget) :
 
     def process_mic_input(self, data, num_channels):
         # Send mic input to our handler
-        event = self.mic_handler.add_data(data)
-        if event:
-            print event
-        if event == 'kick':
-            self.player.on_button_down(0)
-        elif event == 'hihat':
-            self.player.on_button_down(1)
-        elif event == 'snare':
-            self.player.on_button_down(2)
+        if self.training:
+            self.mic_handler.add_training_data(data, self.current_label)
+            pass
+        else:
+            event = self.mic_handler.add_data(data)
+            if event:
+                print event
+            if event == 'kick':
+                self.player.on_button_down(0)
+            elif event == 'hihat':
+                self.player.on_button_down(1)
+            elif event == 'snare':
+                self.player.on_button_down(2)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now
@@ -209,6 +214,7 @@ class MainWidget(BaseWidget) :
                         gem_in_window = abs(time_gap) < kSlopWindow
                         if gems_active and gem_in_window:
                             process_audio = True
+                            self.current_label = self.player.gem_data[self.player.next_gem][1]
 
                     if process_audio:
                         self.mic_audio.on_update()
@@ -232,7 +238,7 @@ class SongData(object):
             gems_data.sort()
             # handle multiple button gems (make a gem for each one)
             for g in gems_data:
-                self.gems.append((float(g[0]), (int(g[1][-1])-1) % len(kImages)))
+                self.gems.append((float(g[0]), (int(g[1][-1])-1)))
             self.gems.sort()
 
         # read barline file

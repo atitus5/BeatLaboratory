@@ -43,6 +43,44 @@ class MicrophoneHandler(object) :
         # Set up and cache window for signal
         self.window = hamming(self.buf_size)
 
+        # Store data for training the classifier
+        feature_count = (kFFTBins / 2) + 1
+        #self.training_data = np.zeros(feature_count + 1, )     # 2D array of (features, label) rows
+
+    '''
+    # Receive data and send back a feature vector for the current window, if buffer fills
+    # Returns empty vector if not ready yet
+    def add_data(self, data, label):
+        event = ""
+
+        # Start processing audio again, if we aren't already
+        self.processing_audio = True
+
+        # Check if we will need to classify an event
+        buffer_full = (self.buf_size - self.buf_idx) < len(data)
+        if buffer_full:
+            # Fill as much as we can, then reset index
+            self.buf[self.buf_idx:] = np.multiply(data[:self.buf_size - self.buf_idx], self.window[self.buf_idx:])
+            self.buf_idx = 0
+
+            # Classify the event now that we have a full buffer
+            event = self._classify_event()
+
+            # Clear buffer out
+            # NOTE: not strictly necessary, since it is overwritten later --- feel free
+            # to delete if performance issues arise
+            self.buf[:] = 0
+
+            # Wait until we are told again to start processing audio
+            self.processing_audio = False
+        else:
+            # Fill 'er up!
+            self.buf[self.buf_idx:self.buf_idx + len(data)] = data
+            self.buf_idx += len(data)
+
+        return event
+    '''
+
     # Receive data and send back a string indicating the event that occurred, if requested.
     # Returns empty string if no event occurred
     def add_data(self, data):

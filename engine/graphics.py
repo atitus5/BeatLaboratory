@@ -122,10 +122,14 @@ class GemDisplay(InstructionGroup):
         #self.color = Color(1,1,1,mode='rgb')
         self.color = Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba')
         #self.gem = Ellipse(pos=pos, size=size)
-        path = kImages[beat]
-        self.gem = Rectangle(pos=pos, size=size, texture=Image(path).texture)
-        self.add(self.color)
-        self.add(self.gem)
+
+        self.gem = None
+        if beat < len(kImages):
+            # We do this because we may want "silence" gems for training, with no image
+            path = kImages[beat]
+            self.gem = Rectangle(pos=pos, size=size, texture=Image(path).texture)
+            self.add(self.color)
+            self.add(self.gem)
 
         self.pos = pos
         self.size = size
@@ -136,12 +140,14 @@ class GemDisplay(InstructionGroup):
 
     # immediately change the gem's position without animating
     def set_pos(self, pos):
-        self.gem.pos = pos
+        if self.gem is not None:
+            self.gem.pos = pos
         self.pos = pos
         self.target_pos = pos
 
     def set_size(self, size):
-        self.gem.size = size
+        if self.gem is not None:
+            self.gem.size = size
         self.size = size
         self.target_size = size
 
@@ -170,8 +176,9 @@ class GemDisplay(InstructionGroup):
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
-            self.gem.pos = (x,y)
-            self.gem.size = (w,h)
+            if self.gem is not None:
+                self.gem.pos = (x,y)
+                self.gem.size = (w,h)
             if self.time == kAnimDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
