@@ -225,7 +225,8 @@ class GemDisplay(InstructionGroup):
                 alpha = self.alpha_anim.eval(self.hit_time)
                 r = self.size_anim.eval(self.hit_time)
 
-                self.gem.size = (r, r)
+                if self.gem != None:
+                    self.gem.size = (r, r)
                 self.color.a = alpha
 
                 size_diff = self.prev_anim_size - r
@@ -233,7 +234,8 @@ class GemDisplay(InstructionGroup):
                 y = self.pos[1] + .5*size_diff
 
                 self.pos = np.array([x, y])
-                self.gem.pos = (x, y)
+                if self.gem != None:
+                    self.gem.pos = (x, y)
 
                 self.prev_anim_size = r
 

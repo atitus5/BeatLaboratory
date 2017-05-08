@@ -10,11 +10,11 @@ if len(sys.argv) >= 2:
     kSeek = float(sys.argv[1])
 kUseMic = True
 kRecord = False
-kLoadModel = False
+kDefaultModel = False
 if len(sys.argv) >= 3:
     kUseMic = not sys.argv[2] == 'nomic'
     kRecord = sys.argv[2] == 'record'
-    kLoadModel = sys.argv[2] == 'loadmodel'
+    kDefaultModel = sys.argv[2] == 'defaultmodel'
 
 # other game files
 from graphics import *
@@ -98,7 +98,7 @@ class MainWidget(BaseWidget) :
             slop_frames = int(kSlopWindow * kSampleRate)
             self.mic_handler = MicrophoneHandler(1, slop_frames, self.mic_audio.buffer_size)
 
-            if not kLoadModel:
+            if not kDefaultModel:
                 # Need to train a classifier first
                 self.training = True
                 self.current_label = None   # Will be set before it is used, no problemos
@@ -113,8 +113,7 @@ class MainWidget(BaseWidget) :
                 self.train_popup.bind(on_dismiss=self.start_training)
                 self.train_popup.open()
             else:
-                # Load our pre-trained classifier
-                self.mic_handler.load_classifier(model_path)
+                # Pre-trained classifier already loaded - let's roll!
                 self.stop_training(None)
         else:
             # No classifier to train - just go!
@@ -167,28 +166,27 @@ class MainWidget(BaseWidget) :
             if kRecord:
                 self.writer.toggle()
 
-        # button down
-        button_idx = lookup(keycode[1], '123', (0,1,2))
-        if button_idx != None:
-            self.player.on_button_down(button_idx)
+        if not kUseMic:
+            # button down
+            button_idx = lookup(keycode[1], '123', (0,1,2))
+            if button_idx != None:
+                self.player.on_button_down(button_idx)
 
     def process_mic_input(self, data, num_channels):
         # Send mic input to our handler
         if self.training:
             self.mic_handler.add_training_data(data, self.current_label)
+
+            if not self.mic_handler.processing_audio:
+                # Send a "no-event" event so that next_gem is updated properly
+                self.player.on_event(kNoEvent)
         else:
             start_t = time.time()
-            event = self.mic_handler.add_data(data)
-            if event:
-                print event
-            if event == 'kick':
-                self.player.on_event(0)
-            elif event == 'hihat':
-                self.player.on_event(1)
-            elif event == 'snare':
-                self.player.on_event(2)
-            elif event == 'silence':
-                self.player.on_event(254)
+            label = self.mic_handler.add_data(data)
+            event = kLabelToEvent[label]
+            if event is not kNoEvent:
+                print label
+                self.player.on_event(event)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now
@@ -203,40 +201,38 @@ class MainWidget(BaseWidget) :
             self.multiplier_streak_label.text = ''
 
         self.music_audio.on_update()
-        if kUseMic:
-            if self.player is not None:
-                if self.training:
-                    if self.player.next_gem >= len(self.player.gem_data):
-                        if self.train_popup is None:
-                            # We're done! Train the classifier, then display another popup
-                            self.mic_handler.train_classifier()
-                            self.mic_handler.save_classifier(model_path)
+        if kUseMic and self.player is not None:
+            if self.training:
+                if self.player.next_gem >= len(self.player.gem_data):
+                    if self.train_popup is None:
+                        # We're done! Train the classifier, then display another popup
+                        self.mic_handler.train_classifier()
 
-                            self.train_popup = Popup(title="You're ready to go!",
-                                                    content=Label(text="You're all ready to play!\n" + 
-                                                                  "\nSimply press anywhere outside of this box to begin."),
-                                                    size_hint=(None, None),
-                                                    size=(400,400)) 
-                            self.train_popup.bind(on_dismiss=self.stop_training)
-                            self.train_popup.open()
-                        return
+                        self.train_popup = Popup(title="You're ready to go!",
+                                                content=Label(text="You're all ready to play!\n" + 
+                                                              "\nSimply press anywhere outside of this box to begin."),
+                                                size_hint=(None, None),
+                                                size=(400,400)) 
+                        self.train_popup.bind(on_dismiss=self.stop_training)
+                        self.train_popup.open()
+                    return
 
-                if self.training or not self.bg.paused:
-                    process_audio = self.mic_handler.processing_audio
+            if self.training or not self.bg.paused:
+                process_audio = self.mic_handler.processing_audio
 
-                    # Only start processing audio if we have a gem within its slop window
-                    # NOTE: this assumes our slop window is small enough to not spill into
-                    # the slop windows of neighboring gems
-                    if not process_audio:
-                        gems_active = self.player.next_gem < len(self.player.gem_data)
-                        time_gap = self.player.gem_data[self.player.next_gem][0] - self.player.now
-                        gem_in_window = abs(time_gap) < kSlopWindow
-                        if gems_active and gem_in_window:
-                            process_audio = True
-                            self.current_label = self.player.gem_data[self.player.next_gem][1]
+                # Only start processing audio if we have a gem within its slop window
+                # NOTE: this assumes our slop window is small enough to not spill into
+                # the slop windows of neighboring gems
+                if not process_audio:
+                    gems_active = self.player.next_gem < len(self.player.gem_data)
+                    time_gap = self.player.gem_data[self.player.next_gem][0] - self.player.now
+                    gem_in_window = abs(time_gap) < kSlopWindow
+                    if gems_active and gem_in_window:
+                        process_audio = True
+                        self.current_label = self.player.gem_data[self.player.next_gem][1]
 
-                    if process_audio:
-                        self.mic_audio.on_update()
+                if process_audio:
+                    self.mic_audio.on_update()
 
 
 # PARSE DATA (gems & barlines)
@@ -344,6 +340,8 @@ class Player(object):
     def on_update(self, dt):
         self.now += dt
 
+        # There is no concept of a temporal miss with mic input, since we always
+        # check the gem when it's done being processed!
         if not kUseMic:
             # check for temporal miss
             while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
