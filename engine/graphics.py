@@ -159,6 +159,7 @@ class GemDisplay(InstructionGroup):
         self.size_anim = KFAnim((0, kGemWidth), (.125, 1.25*kGemWidth), (.5, 0))
         self.alpha_anim = KFAnim((0, 1), (.5, 0))
 
+
     # immediately change the gem's position without animating
     def set_pos(self, pos):
         if self.gem is not None:
@@ -166,13 +167,15 @@ class GemDisplay(InstructionGroup):
         self.pos = pos
         self.target_pos = pos
 
+    # immediately change the gem's size without animating
     def set_size(self, size):
         if self.gem is not None:
             self.gem.size = size
         self.size = size
         self.target_size = size
 
-    def transform(self, pos, size, animDur = kAnimDur):
+    # gradually change the gem's position and size over animDur seconds
+    def transform(self, pos, size, animDur=kAnimDur):
         self.target_pos = pos
         self.target_size = size
         self.shift_time = 0
@@ -206,15 +209,16 @@ class GemDisplay(InstructionGroup):
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
 
-            if self.gem is not None:
+            if self.gem != None:
                 self.gem.pos = (x,y)
                 self.gem.size = (w,h)
 
-            if self.shift_time == kAnimDur:
+            if self.shift_time == self.animDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
                 self.shift_animating = False
                 shift = False
+
             else:
                 shift = True
 
@@ -302,7 +306,6 @@ class MeasureDisplay(InstructionGroup):
     def __init__(self, pos, size, gems):
         super(MeasureDisplay, self).__init__()
 
-        self.size = size
         self.gems = []
         w = int((size[0])*len(gems)**-1)
         h = size[1]
@@ -316,40 +319,30 @@ class MeasureDisplay(InstructionGroup):
             else:
                 self.gems.append(None)
 
-        self.animating = []
+        self.updates = []
 
     # update position and size with animation
     def transform(self, pos, size, animDur=kAnimDur):
-        self.size = size
         self.animating = []
-        for i in range(len(self.gems)):
-            if self.gems[i] != None:
-                x = pos[0] + float(i * size[0])/len(self.gems)
-                y = pos[1]
-                w = int((size[0])*len(self.gems)**-1)
-                h = size[1]
-                self.gems[i].transform((x,y),(w,h), animDur)
-                self.animating.append(self.gems[i])
-
-    # immediately update position without animating
-    def set_pos(self, pos):
-        w = int((self.size[0])*len(self.gems)**-1)
-        h = self.size[1]
-        y = pos[1]
-        for i in range(len(self.gems)):
-            if self.gems[i] != None:
-                x = pos[0] + w*i
-                self.gems[i].set_pos((x,y))
-                self.gems[i].set_size((w,h))
-
-    def set_size(self, size):
-        self.size = size
         w = int((size[0])*len(self.gems)**-1)
+        y = pos[1]
         h = size[1]
         for i in range(len(self.gems)):
             if self.gems[i] != None:
-                self.gems[i].set_size((w,h))
+                x = pos[0] + float(i * size[0])/len(self.gems)
+                self.gems[i].transform((x,y),(w,h), animDur)
+                self.updates.append(self.gems[i])
 
+    # immediately update position without animating
+    def set_pos_size(self, pos, size):
+        w = int((size[0])*len(self.gems)**-1)
+        y = pos[1]
+        h = size[1]
+        for i in range(len(self.gems)):
+            if self.gems[i] != None:
+                x = pos[0] + float(i * size[0])/len(self.gems)
+                self.gems[i].set_pos((x,y))
+                self.gems[i].set_size((w,h))
 
     # get the i'th gem of the measure
     def get_gem(self, gem_idx):
@@ -364,13 +357,11 @@ class MeasureDisplay(InstructionGroup):
 
     # let animating gems animate
     def on_update(self, dt):
-        for gem in self.animating:
-            if gem == None:
-                continue
-            cont = gem.on_update(dt)
+        for elm in self.updates:
+            cont = elm.on_update(dt)
             if not cont:
-                self.animating.remove(gem)
-        return len(self.animating) > 0
+                self.updates.remove(elm)
+        return len(self.updates) > 0
 
 
 class HitParticleDisplay(InstructionGroup):
@@ -495,8 +486,7 @@ class BeatMatchDisplay(InstructionGroup):
             x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
             w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
             h = kMeasureHeight * (1 if i==0 else kPreviews[i-1])
-            self.bars[self.current_bar + i].set_size((w, h))
-            self.bars[self.current_bar + i].set_pos((x, y))
+            self.bars[self.current_bar + i].set_pos_size((x,y), (w, h))
             self.add(self.bars[self.current_bar + i])
 
     # stop displaying current measure, move preivews up, add next preview measure
@@ -509,7 +499,7 @@ class BeatMatchDisplay(InstructionGroup):
         animDur = self.bar_durations[self.current_bar]*(2*kNumGems)**-1
         self.current_bar += 1
         # move preview measures up
-        for i in range(min(len(kPreviews)+1, len(self.bars) - self.current_bar - 1)):
+        for i in range(min(len(kPreviews) + 1, len(self.bars) - self.current_bar - 1)):
             y = previewY(i) + kBoxThickness
             x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
             w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
