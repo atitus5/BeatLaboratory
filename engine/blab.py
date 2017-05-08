@@ -1,4 +1,4 @@
-#gui.py
+#blab.py
 
 # IMPORTS
 import sys
@@ -38,9 +38,9 @@ kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of
 snapGems = True # snap gems to fraction of a barline.
 
 # audio
-kNumChannels = 2
 #song_path = '../data/BeatItNoDrums' # could make command argument in future
 song_path = '../data/24KMagicNoDrums' # could make command argument in future
+train_song_path = '../data/training' # could make command argument in future
 
 
 # MAIN WIDGET
@@ -49,10 +49,10 @@ class MainWidget(BaseWidget) :
         super(MainWidget, self).__init__()
         # Set up audio input and output
         self.writer = AudioWriter('data') # for debugging audio output
-        self.music_audio = MusicAudio(kNumChannels)
+        self.music_audio = MusicAudio(2)
 
         if usemic:
-            self.mic_audio = MicAudio(kNumChannels, self.writer.add_audio, self.process_mic_input)
+            self.mic_audio = MicAudio(1, self.writer.add_audio, self.process_mic_input)
 
         # game audio output
         self.mixer = Mixer()
@@ -64,6 +64,11 @@ class MainWidget(BaseWidget) :
         self.song_data = SongData()
         self.song_data.read_data(song_path+'_gems.txt', song_path+'_barlines.txt')
 
+        # training song data
+        self.train_song_data = SongData()
+        self.train_song_data.read_data(train_song_path+'_gems.txt', train_song_path+'_barlines.txt')
+        self.training = True
+
         # game text
         self.score_label = topleft_label()
         self.add_widget(self.score_label)
@@ -72,25 +77,75 @@ class MainWidget(BaseWidget) :
         # static title label
         self.add_widget(title_label())
 
-        # graphics
-        self.bmd = BeatMatchDisplay(self.song_data, seek)
-        self.canvas.add(self.bmd)
-
-        self.bmd.install_particle_systems(self)
-
-        # Set up microphone input handling
-        if usemic:
-            slop_frames = int(kSlopWindow * kSampleRate)
-            self.mic_handler = MicrophoneHandler(kNumChannels, slop_frames, self.mic_audio.buffer_size)
+        self.player = None
+        self.bmd = None
+        self.training = True
 
         # timekeeping
         self.clock = Clock()
         self.clock.stop()
+        self.now = 0
+
+        # Set up microphone input handling
+        if usemic:
+            # Set up microphone input handling and training
+            slop_frames = int(kSlopWindow * kSampleRate)
+            self.mic_handler = MicrophoneHandler(1, slop_frames, self.mic_audio.buffer_size)
+
+            self.training = True
+            self.current_label = None   # Will be set before it is used, no problemos
+            self.train_popup = Popup(title="Welcome to BeatLaboratory!",
+                                    content=Label(text="Welcome to BeatLaboratory! Because everyone has\n" +
+                                                  "their own beatboxing style, we need to learn more\n" +
+                                                  "about yours by hearing you! Make sure your microphone\n" +
+                                                  "is set up, and play along with this simple track!\n" +
+                                                  "\nSimply press anywhere outside of this box to begin."),
+                                    size_hint=(None, None),
+                                    size=(400,400)) 
+            self.train_popup.bind(on_dismiss=self.start_training)
+            self.train_popup.open()
+        else:
+            # No classifier to train - just go!
+            self.stop_training(None)
+
+    def start_training(self, instance):
+        self.train_popup = None 
+
+        if self.bmd is not None:
+            self.canvas.remove(self.bmd)
+
+        # graphics
+        self.bmd = BeatMatchDisplay(self.train_song_data, 0)
+        self.canvas.add(self.bmd)
+        self.bmd.install_particle_systems(self)
+
+        # gameplay
+        self.player = Player(self.train_song_data.gems, self.bmd)
+
+        # Start the training track
+        self.clock.start()
+
+    def stop_training(self, instance):
+        self.train_popup = None 
+
+        # Fix clock
+        self.clock.stop()
         self.now = seek
         self.clock.set_time(seek)
 
+        if self.bmd is not None:
+            self.canvas.remove(self.bmd)
+
+        self.training = False
+
+        # graphics
+        self.bmd = BeatMatchDisplay(self.song_data, seek)
+        self.canvas.add(self.bmd)
+        self.bmd.install_particle_systems(self)
+
         # gameplay
         self.player = Player(self.song_data.gems, self.bmd)
+
 
     def on_key_down(self, keycode, modifiers):
         # play / pause toggle
@@ -107,38 +162,64 @@ class MainWidget(BaseWidget) :
 
     def process_mic_input(self, data, num_channels):
         # Send mic input to our handler
-        event = self.mic_handler.add_data(data)
-        if event:
-            print event
-        if event == 'kick':
-            self.player.on_button_down(0)
-        elif event == 'hihat':
-            self.player.on_button_down(1)
-        elif event == 'snare':
-            self.player.on_button_down(2)
+        if self.training:
+            # self.mic_handler.add_training_data(data, self.current_label)
+            pass
+        else:
+            event = self.mic_handler.add_data(data)
+            if event:
+                print event
+            if event == 'kick':
+                self.player.on_button_down(0)
+            elif event == 'hihat':
+                self.player.on_button_down(1)
+            elif event == 'snare':
+                self.player.on_button_down(2)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now
         self.now += dt
-        self.player.on_update(dt)
+
+        if self.player is not None:
+            self.player.on_update(dt)
+            self.score_label.text = 'score: ' + str(self.player.get_score())
+            self.multiplier_streak_label.text = 'x' + str(self.player.get_multiplier()) + ' (' + str(self.player.get_streak()) + ' in a row)'
+        else:
+            self.score_label.text = ''
+            self.multiplier_streak_label.text = ''
+
         self.music_audio.on_update()
         if usemic:
-            if not self.bg.paused:
-                process_audio = self.mic_handler.processing_audio
+            if self.player is not None:
+                if self.training:
+                    if self.player.next_gem >= len(self.player.gem_data):
+                        if self.train_popup is None:
+                            # We're done! Display another popup
+                            self.train_popup = Popup(title="You're ready to go!",
+                                                    content=Label(text="You're all ready to play!\n" + 
+                                                                  "\nSimply press anywhere outside of this box to begin."),
+                                                    size_hint=(None, None),
+                                                    size=(400,400)) 
+                            self.train_popup.bind(on_dismiss=self.stop_training)
+                            self.train_popup.open()
+                        return
 
-                # Only start processing audio if we have a gem within its slop window
-                # NOTE: this assumes our slop window is small enough to not spill into
-                # the slop windows of neighboring gems
-                if not process_audio:
-                    gems_active = self.player.next_gem < len(self.player.gem_data)
-                    gem_in_window = abs(self.player.gem_data[self.player.next_gem][0] - self.player.now) < kSlopWindow
-                    if gems_active and gem_in_window:
-                        process_audio = True
+                if self.training or not self.bg.paused:
+                    process_audio = self.mic_handler.processing_audio
 
-                if process_audio:
-                    self.mic_audio.on_update()
-        self.score_label.text = 'score: ' + str(self.player.get_score())
-        self.multiplier_streak_label.text = 'x' + str(self.player.get_multiplier()) + ' (' + str(self.player.get_streak()) + ' in a row)'
+                    # Only start processing audio if we have a gem within its slop window
+                    # NOTE: this assumes our slop window is small enough to not spill into
+                    # the slop windows of neighboring gems
+                    if not process_audio:
+                        gems_active = self.player.next_gem < len(self.player.gem_data)
+                        time_gap = self.player.gem_data[self.player.next_gem][0] - self.player.now
+                        gem_in_window = abs(time_gap) < kSlopWindow
+                        if gems_active and gem_in_window:
+                            process_audio = True
+                            self.current_label = self.player.gem_data[self.player.next_gem][1]
+
+                    if process_audio:
+                        self.mic_audio.on_update()
 
 
 # PARSE DATA (gems & barlines)
@@ -159,7 +240,7 @@ class SongData(object):
             gems_data.sort()
             # handle multiple button gems (make a gem for each one)
             for g in gems_data:
-                self.gems.append((float(g[0]), (int(g[1][-1])-1) % len(kImages)))
+                self.gems.append((float(g[0]), (int(g[1][-1])-1)))
             self.gems.sort()
 
         # read barline file

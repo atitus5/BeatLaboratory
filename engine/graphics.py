@@ -63,6 +63,8 @@ from kivy.graphics import PushMatrix, PopMatrix, Translate, Scale, Rotate
 from kivy.clock import Clock as kivyClock
 from kivy.core.image import Image
 from kivy.core.window import Window
+from kivy.uix.popup import Popup
+
 from common.kivyparticle import ParticleSystem
 
 # set background of screen
@@ -119,6 +121,10 @@ def topright_label() :
     return l
 
 
+# MENUS AND POPUPS
+# TODO
+
+
 #KIVY INSTRUCTION GROUPS
 # displays a circle with a color depending on beat type
 class GemDisplay(InstructionGroup):
@@ -127,10 +133,14 @@ class GemDisplay(InstructionGroup):
         #self.color = Color(1,1,1,mode='rgb')
         self.color = Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba')
         #self.gem = Ellipse(pos=pos, size=size)
-        path = kImages[beat]
-        self.gem = Rectangle(pos=pos, size=size, texture=Image(path).texture)
-        self.add(self.color)
-        self.add(self.gem)
+
+        self.gem = None
+        if beat < len(kImages):
+            # We do this because we may want "silence" gems for training, with no image
+            path = kImages[beat]
+            self.gem = Rectangle(pos=pos, size=size, texture=Image(path).texture)
+            self.add(self.color)
+            self.add(self.gem)
 
         self.pos = pos
         self.size = size
@@ -142,13 +152,15 @@ class GemDisplay(InstructionGroup):
 
     # immediately change the gem's position without animating
     def set_pos(self, pos):
-        self.gem.pos = pos
+        if self.gem is not None:
+            self.gem.pos = pos
         self.pos = pos
         self.target_pos = pos
 
     # immediately change the gem's size without animating
     def set_size(self, size):
-        self.gem.size = size
+        if self.gem is not None:
+            self.gem.size = size
         self.size = size
         self.target_size = size
 
@@ -179,9 +191,10 @@ class GemDisplay(InstructionGroup):
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
-            self.gem.pos = (x,y)
-            self.gem.size = (w,h)
-            if self.time == self.animDur:
+            if self.gem is not None:
+                self.gem.pos = (x,y)
+                self.gem.size = (w,h)
+            if self.time == kAnimDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
                 self.animating = False
@@ -498,6 +511,9 @@ class BeatMatchDisplay(InstructionGroup):
         if self.bar_dur >= (2*kNumGems-1)*(2*kNumGems)**-1 * self.bar_durations[self.current_bar]:
             self.bar_dur -= self.bar_durations[self.current_bar]
             self.__update_display()
+
+        if self.current_bar >= len(self.bar_durations):
+            return
 
         progress = self.bar_dur * self.bar_durations[self.current_bar]**-1
         progress += (2*kNumGems)**-1 # nowbar goes in middle of gem on exact hit, not front
