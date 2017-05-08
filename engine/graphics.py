@@ -328,33 +328,57 @@ class MeasureDisplay(InstructionGroup):
 class HitParticleDisplay(InstructionGroup):
     def __init__(self, pos, size):
         super(HitParticleDisplay, self).__init__()
-        self.psystems = []
-        self.hit_times = [-1]
+        # particle systems on active measure
+        self.m_psystems = []
+        self.m_hit_times = [-1]
         for i in range(kNumGems):
-            ps = ParticleSystem('../particle/particle.pex')
+            ps = ParticleSystem('../particle/particle1.pex')
             ps.emitter_x = pos[0] + (i + 0.5) * kNumGems ** -1 * size[0]
             ps.emitter_y = pos[1] + .5*size[1]
-            self.psystems.append(ps)
-            self.hit_times.append(-1)
+            self.m_psystems.append(ps)
+            self.m_hit_times.append(-1)
+
+        # particle systems on bottom corners of screen
+        self.bl = ParticleSystem('../particle/particle2.pex')
+        self.bl.emitter_x = 0
+        self.bl.emitter_y = 0
+        self.bl.emit_angle = np.pi*4**-1
+        self.br = ParticleSystem('../particle/particle2.pex')
+        self.br.emitter_x = kWindowWidth-1
+        self.br.emitter_y = 0
+        self.br.emit_angle = 3*np.pi*4**-1
+        self.b_hit_time = -1
+
 
     def puff(self, i):
-        if i < 0 or i > len(self.psystems):
+        if i < 0 or i > len(self.m_psystems):
             print "warning: ps puff out of bounds"
             return
-        self.psystems[i].start()
-        self.hit_times[i] = 0
+        self.m_psystems[i].start()
+        self.m_hit_times[i] = 0
+        self.bl.start()
+        self.br.start()
+        self.b_hit_time = 0
 
     def install_particle_systems(self, widget):
-        for ps in self.psystems:
+        for ps in self.m_psystems:
             widget.add_widget(ps)
+        widget.add_widget(self.bl)
+        widget.add_widget(self.br)
 
     def on_update(self, dt):
-        for i in range(len(self.hit_times)):
-            if self.hit_times[i] >= 0:
-                self.hit_times[i] += dt
-            if self.hit_times[i] >= kHitAnimDur:
-                self.hit_times[i] = -1
-                self.psystems[i].stop()
+        for i in range(len(self.m_hit_times)):
+            if self.m_hit_times[i] >= 0:
+                self.m_hit_times[i] += dt
+            if self.m_hit_times[i] >= kHitAnimDur:
+                self.m_hit_times[i] = -1
+                self.m_psystems[i].stop()
+        if self.b_hit_time >= 0:
+            self.b_hit_time += dt
+        if self.b_hit_time >= kHitAnimDur:
+            self.b_hit_time = -1
+            self.bl.stop()
+            self.br.stop()
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
