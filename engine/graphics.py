@@ -28,7 +28,7 @@ kTitleFontSize = .8 * kTopY
 kBottomFontSize = 0.7 * kBottomY
 kReplaceMe = 100
 kAnimDur = .25 # number of seconds animations take
-kHitAnimDur = .25 # number of seconds hit animations take
+kHitAnimDur = .5 # number of seconds hit animations take
 
 
 
@@ -156,8 +156,8 @@ class GemDisplay(InstructionGroup):
         self.shift_animating = False
         self.hit_animating = False
 
-        self.size_anim = KFAnim((0, (self.size[0], self.size[1])), (.5, (1.5*self.size[0], 1.5*self.size[1])), (1, (0, 0)))
-        self.alpha_anim = KFAnim((0, 1), (1, 0))
+        self.size_anim = KFAnim((0, kGemWidth), (.125, 1.25*kGemWidth), (.5, 0))
+        self.alpha_anim = KFAnim((0, 1), (.5, 0))
 
     # immediately change the gem's position without animating
     def set_pos(self, pos):
@@ -191,8 +191,11 @@ class GemDisplay(InstructionGroup):
         self.hit_animating = True
 
 
+
     # update position and size of gem if it is animating
     def on_update(self, dt):
+        shift = True
+        hit = True
         if self.shift_animating:
             self.shift_time += dt
             if self.shift_time > self.animDur:
@@ -211,22 +214,26 @@ class GemDisplay(InstructionGroup):
                 self.pos = self.target_pos
                 self.size = self.target_size
                 self.shift_animating = False
+                shift = False
             else:
-                return True
+                shift = True
 
         if self.hit_animating:
             self.hit_time += dt
 
             if self.hit_time < self.deathTime:
                 alpha = self.alpha_anim.eval(self.hit_time)
-                w, h = self.size_anim.eval(self.hit_time)
+                r = self.size_anim.eval(self.hit_time)
 
-                self.gem.size = (w, h)
+                self.gem.size = (r, r)
                 self.color.a = alpha
 
-                return True
+                hit = True
+            else:
+                self.hit_animating = False
+                hit = False
 
-        return False
+        return hit and shift
 
 
 # a rectangle border
