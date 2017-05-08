@@ -43,7 +43,6 @@ kNumChannels = 2
 song_path = '../data/24KMagicNoDrums' # could make command argument in future
 
 
-
 # MAIN WIDGET
 class MainWidget(BaseWidget) :
     def __init__(self):
@@ -76,6 +75,8 @@ class MainWidget(BaseWidget) :
         # graphics
         self.bmd = BeatMatchDisplay(self.song_data, seek)
         self.canvas.add(self.bmd)
+
+        self.bmd.install_particle_systems(self)
 
         # Set up microphone input handling
         if usemic:
@@ -211,7 +212,6 @@ class Player(object):
                 if abs(self.gem_data[i][0] - self.now) < kSlopWindow:
                     if self.gem_data[i][1] == lane:
                         self.display.gem_hit(i)
-                        print 'hit', i
                         self.next_gem += 1
                         self.streak += 1
                         self.score += 1 * min(4, 1 + self.streak/5)
