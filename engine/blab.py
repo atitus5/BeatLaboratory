@@ -8,15 +8,16 @@ sys.path.append('..')
 kSeek = 0.0
 if len(sys.argv) >= 2:
     kSeek = float(sys.argv[1])
-usemic = True
-record = False
+kUseMic = True
+kRecord = False
 if len(sys.argv) >= 3:
-    usemic = not sys.argv[2] == 'nomic'
-    record = sys.argv[2] == 'record'
+    kUseMic = not sys.argv[2] == 'nomic'
+    kRecord = sys.argv[2] == 'record'
+    kLoadModel = sys.argv[2] == 'loadmodel'
 
 # other game files
 from graphics import *
-if usemic:
+if kUseMic:
     from mic import *
 
 # common
@@ -43,6 +44,9 @@ snapGems = True # snap gems to fraction of a barline.
 song_path = '../data/24KMagicNoDrums' # could make command argument in future
 train_song_path = '../data/training' # could make command argument in future
 
+# Save classifier model as Pickle binary
+model_path = "../data/classifier_model.pkl"
+
 
 # MAIN WIDGET
 class MainWidget(BaseWidget) :
@@ -52,7 +56,7 @@ class MainWidget(BaseWidget) :
         self.writer = AudioWriter('data') # for debugging audio output
         self.music_audio = MusicAudio(2)
 
-        if usemic:
+        if kUseMic:
             self.mic_audio = MicAudio(1, self.writer.add_audio, self.process_mic_input)
 
         # game audio output
@@ -88,23 +92,29 @@ class MainWidget(BaseWidget) :
         self.now = 0
 
         # Set up microphone input handling
-        if usemic:
+        if kUseMic:
             # Set up microphone input handling and training
             slop_frames = int(kSlopWindow * kSampleRate)
             self.mic_handler = MicrophoneHandler(1, slop_frames, self.mic_audio.buffer_size)
 
-            self.training = True
-            self.current_label = None   # Will be set before it is used, no problemos
-            self.train_popup = Popup(title="Welcome to BeatLaboratory!",
-                                    content=Label(text="Welcome to BeatLaboratory! Because everyone has\n" +
-                                                  "their own beatboxing style, we need to learn more\n" +
-                                                  "about yours by hearing you! Make sure your microphone\n" +
-                                                  "is set up, and play along with this simple track!\n" +
-                                                  "\nSimply press anywhere outside of this box to begin."),
-                                    size_hint=(None, None),
-                                    size=(400,400)) 
-            self.train_popup.bind(on_dismiss=self.start_training)
-            self.train_popup.open()
+            if not kLoadModel:
+                # Need to train a classifier first
+                self.training = True
+                self.current_label = None   # Will be set before it is used, no problemos
+                self.train_popup = Popup(title="Welcome to BeatLaboratory!",
+                                        content=Label(text="Welcome to BeatLaboratory! Because everyone has\n" +
+                                                      "their own beatboxing style, we need to learn more\n" +
+                                                      "about yours by hearing you! Make sure your microphone\n" +
+                                                      "is set up, and play along with this simple track!\n" +
+                                                      "\nSimply press anywhere outside of this box to begin."),
+                                        size_hint=(None, None),
+                                        size=(400,400)) 
+                self.train_popup.bind(on_dismiss=self.start_training)
+                self.train_popup.open()
+            else:
+                # Load our pre-trained classifier
+                self.mic_handler.load_classifier(model_path)
+                self.stop_training(None)
         else:
             # No classifier to train - just go!
             self.stop_training(None)
@@ -153,7 +163,7 @@ class MainWidget(BaseWidget) :
         if keycode[1] == 'p':
             self.clock.toggle()
             self.bg.play_toggle()
-            if record:
+            if kRecord:
                 self.writer.toggle()
 
         # button down
@@ -166,15 +176,18 @@ class MainWidget(BaseWidget) :
         if self.training:
             self.mic_handler.add_training_data(data, self.current_label)
         else:
+            start_t = time.time()
             event = self.mic_handler.add_data(data)
             if event:
                 print event
             if event == 'kick':
-                self.player.on_button_down(0)
+                self.player.on_event(0)
             elif event == 'hihat':
-                self.player.on_button_down(1)
+                self.player.on_event(1)
             elif event == 'snare':
-                self.player.on_button_down(2)
+                self.player.on_event(2)
+            elif event == 'silence':
+                self.player.on_event(254)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now
@@ -189,13 +202,14 @@ class MainWidget(BaseWidget) :
             self.multiplier_streak_label.text = ''
 
         self.music_audio.on_update()
-        if usemic:
+        if kUseMic:
             if self.player is not None:
                 if self.training:
                     if self.player.next_gem >= len(self.player.gem_data):
                         if self.train_popup is None:
                             # We're done! Train the classifier, then display another popup
                             self.mic_handler.train_classifier()
+                            self.mic_handler.save_classifier(model_path)
 
                             self.train_popup = Popup(title="You're ready to go!",
                                                     content=Label(text="You're all ready to play!\n" + 
@@ -312,14 +326,30 @@ class Player(object):
         # on miss
         self.streak = 0
 
+    # called by MainWidget
+    def on_event(self, lane):
+        if self.next_gem < len(self.gem_data):
+            # check for hit
+            if self.gem_data[self.next_gem][1] == lane:
+                self.display.gem_hit(self.next_gem)
+                self.streak += 1
+                self.score += 1 * min(4, 1 + self.streak/5)
+            else:
+                self.display.gem_miss(self.next_gem)
+                self.streak = 0
+            self.next_gem += 1
+
     # needed to check if for pass gems (ie, went past the slop window)
     def on_update(self, dt):
         self.now += dt
-        # check for temporal miss
-        while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
-            self.display.gem_miss(self.next_gem)
-            self.next_gem += 1
-            self.streak = 0
+
+        if not kUseMic:
+            # check for temporal miss
+            while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
+                self.display.gem_miss(self.next_gem)
+                self.next_gem += 1
+                self.streak = 0
+
         self.display.on_update(dt)
 
     def get_score(self):

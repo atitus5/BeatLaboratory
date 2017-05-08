@@ -3,6 +3,7 @@
 
 import math
 
+import cPickle
 import numpy as np
 from numpy.fft import rfft
 import numpy.linalg as LA
@@ -68,8 +69,16 @@ class MicrophoneHandler(object) :
             0: "kick",
             1: "hihat",
             2: "snare",
-            254: ""
+            254: "silence"
         }
+
+    def load_classifier(self, path):
+        with open(path, "rb") as fid:
+            self.classifier = cPickle.load(fid)
+
+    def save_classifier(self, path):
+        with open(path, "wb") as fid:
+            cPickle.dump(self.classifier, fid)
 
     # Receive data and send back a feature vector for the current window, if buffer fills
     def add_training_data(self, data, label):
@@ -85,8 +94,7 @@ class MicrophoneHandler(object) :
 
             # Convert the buffer to features
             feature_vec = self._get_feature_vec()
-            if feature_vec is not None:
-                self.training_data.append([feature_vec, label])
+            self.training_data.append([feature_vec, label])
 
             # Clear buffer out
             # NOTE: not strictly necessary, since it is overwritten later --- feel free
@@ -113,6 +121,7 @@ class MicrophoneHandler(object) :
         labels = np.asarray(labels)
 
         self.classifier.fit(features, labels)
+        self.training_data = None
 
         end_t = time.time()
         elapsed_t = end_t - start_t
@@ -161,8 +170,10 @@ class MicrophoneHandler(object) :
         abs_spectrum = np.asarray(map(abs, spectrum)).T
         mel_energies = np.dot(kMelFilterBank, abs_spectrum)
         if np.count_nonzero(mel_energies) < len(mel_energies):
-            # We're going to divide by zero ABORT ABORT ABORT
-            return None
+            # We're going to divide by zero... add a tiny epsilon to the energies
+            eps = 1e-9
+            mel_energies = np.add(np.multiply(eps, np.ones(len(mel_energies))), mel_energies)
+            
         mfsc = np.maximum(np.multiply(-50.0, np.ones(kMelFilterBank.shape[0])),
                           np.log(mel_energies))
 
@@ -194,24 +205,16 @@ class MicrophoneHandler(object) :
         feature_vec[kNumMFCCs + kEnergyBands] = zero_crossings
         feature_vec[kNumMFCCs + kEnergyBands + 1] = kurt
 
-        print ",".join(map(str, list(feature_vec)))
-
         return feature_vec
 
     # Takes our full buffer of windowed data and classifies it as an appropriate beatbox sound
     def _classify_event(self):
         # Get features (in the format scikit-learn expects)
         feature_vec = self._get_feature_vec()
-        print ",".join(map(str, list(feature_vec)))
         feature_vec = np.reshape(feature_vec, (1, len(feature_vec)))
 
         # Classify it! (Woah, that's what this line of code does?!)
         event = self.classifier.predict(feature_vec)[0]
         classification = self.event_to_label[event]
-
-        '''
-        print "Event: %s" % str(event)
-        print "Label: %s" % classification
-        '''
 
         return classification
