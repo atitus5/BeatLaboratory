@@ -36,6 +36,10 @@ kHitAnimDur = .5 # number of seconds hit animations take
 kNumGems = 8 # numbber of gems allowed per bar
 kPreviews = np.array([2**i*3**-i for i in range(1,4)])
 
+kGemParticlePath = "../particle/particle1.pex"
+#kCornerParticlePath = "../particle/particle2.pex"
+kCornerParticlePath = "../particle/fire_particle.pex"
+
 # these are just convenient
 kMeasureWidth = kNumGems * kGemWidth
 kMeasureHeight = kGemHeight
@@ -504,18 +508,18 @@ class HitParticleDisplay(InstructionGroup):
         self.m_psystems = []
         self.m_hit_times = [-1]
         for i in range(kNumGems):
-            ps = ParticleSystem('../particle/particle1.pex')
+            ps = ParticleSystem(kGemParticlePath)
             ps.emitter_x = pos[0] + (i + 0.5) * kNumGems ** -1 * size[0]
             ps.emitter_y = pos[1] + .5*size[1]
             self.m_psystems.append(ps)
             self.m_hit_times.append(-1)
 
         # particle systems on bottom corners of screen
-        self.bl = ParticleSystem('../particle/particle2.pex')
+        self.bl = ParticleSystem(kCornerParticlePath)
         self.bl.emitter_x = 0
         self.bl.emitter_y = 0
         self.bl.emit_angle = np.pi*4**-1
-        self.br = ParticleSystem('../particle/particle2.pex')
+        self.br = ParticleSystem(kCornerParticlePath)
         self.br.emitter_x = kWindowWidth-1
         self.br.emitter_y = 0
         self.br.emit_angle = 3*np.pi*4**-1
