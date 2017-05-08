@@ -10,6 +10,7 @@ if len(sys.argv) >= 2:
     kSeek = float(sys.argv[1])
 kUseMic = True
 kRecord = False
+kLoadModel = False
 if len(sys.argv) >= 3:
     kUseMic = not sys.argv[2] == 'nomic'
     kRecord = sys.argv[2] == 'record'
