@@ -28,13 +28,12 @@ kTitleFontSize = .8 * kTopY
 kBottomFontSize = 0.7 * kBottomY
 kReplaceMe = 100
 kAnimDur = .25 # number of seconds animations take
-kHitAnimDur = .25 # number of seconds hit animations take
+kHitAnimDur = .5 # number of seconds hit animations take
 
 
 
 # graphics that indirectly affect gameplay
 kNumGems = 8 # numbber of gems allowed per bar
-#kPreviews = np.array([2**i*3**-i for i in range(1,7)])
 kPreviews = np.array([2**i*3**-i for i in range(1,4)])
 
 # these are just convenient
@@ -59,7 +58,7 @@ Config.set('graphics', 'width', str(kWindowWidth))
 Config.set('graphics', 'height', str(kWindowHeight))
 
 from kivy.graphics.instructions import InstructionGroup
-from kivy.graphics import Color, Ellipse, Line, Rectangle
+from kivy.graphics import Color, Ellipse, Line, Rectangle, Bezier
 from kivy.graphics import PushMatrix, PopMatrix, Translate, Scale, Rotate
 from kivy.clock import Clock as kivyClock
 from kivy.core.image import Image
@@ -147,9 +146,21 @@ class GemDisplay(InstructionGroup):
         self.size = size
         self.target_pos = pos
         self.target_size = size
-        self.time = 0
+
+        self.shift_time = 0
+        self.hit_time = 0
+
         self.animDur = kAnimDur
-        self.animating = False
+        self.deathTime = kHitAnimDur
+
+        self.shift_animating = False
+        self.hit_animating = False
+
+        self.size_anim = KFAnim((0, kGemWidth), (.1, 1.125*kGemWidth), (.5, 0))
+        self.alpha_anim = KFAnim((0, 1), (.5, 0))
+
+        self.prev_anim_size = kGemWidth
+
 
     # immediately change the gem's position without animating
     def set_pos(self, pos):
@@ -158,17 +169,20 @@ class GemDisplay(InstructionGroup):
         self.pos = pos
         self.target_pos = pos
 
+    # immediately change the gem's size without animating
     def set_size(self, size):
         if self.gem is not None:
             self.gem.size = size
         self.size = size
         self.target_size = size
 
-    def transform(self, pos, size, animDur = kAnimDur):
+    # gradually change the gem's position and size over animDur seconds
+    def transform(self, pos, size, animDur=kAnimDur):
         self.target_pos = pos
         self.target_size = size
-        self.time = 0
-        self.animating = True
+        self.shift_time = 0
+        self.shift_animating = True
+
         self.animDur = animDur
 
     # change to display this gem being hit
@@ -177,49 +191,150 @@ class GemDisplay(InstructionGroup):
 
     # change to display this gem being hit
     def on_hit(self):
-        self.color.rgba = (1,1,1,0) # invisible
+        # self.color.rgba = (1,1,1,0) # invisible
+        self.hit_time = 0
+        self.hit_animating = True
+
+
 
     # update position and size of gem if it is animating
     def on_update(self, dt):
-        if self.animating:
-            self.time += dt
-            if self.time > self.animDur:
-                self.time = self.animDur
-            progress = (self.time * self.animDur**-1)
+        if self.shift_animating:
+            self.shift_time += dt
+            if self.shift_time > self.animDur:
+                self.shift_time = self.animDur
+            progress = (self.shift_time * self.animDur**-1)
             x = progress * (self.target_pos[0] - self.pos[0]) + self.pos[0]
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
-            if self.gem is not None:
+
+            if self.gem != None:
                 self.gem.pos = (x,y)
                 self.gem.size = (w,h)
-            if self.time == kAnimDur:
+
+            if self.shift_time == self.animDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
-                self.animating = False
+                self.shift_animating = False
+
+        if self.hit_animating:
+            self.hit_time += dt
+
+            if self.hit_time < self.deathTime:
+                alpha = self.alpha_anim.eval(self.hit_time)
+                r = self.size_anim.eval(self.hit_time)
+
+                self.gem.size = (r, r)
+                self.color.a = alpha
+
+                size_diff = self.prev_anim_size - r
+                x = self.pos[0] + .5*size_diff
+                y = self.pos[1] + .5*size_diff
+
+                self.pos = np.array([x, y])
+                self.gem.pos = (x, y)
+
+                self.prev_anim_size = r
+
             else:
-                return True
-        return False
+                self.hit_animating = False
+
+
+        return self.hit_animating or self.shift_animating
 
 
 # a rectangle border
 class BoxDisplay(InstructionGroup):
     def __init__(self, pos, size, thickness):
         super(BoxDisplay, self).__init__()
+
+        #outer
         self.add(Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba'))
+        self.outer_size = size
+        self.outer_pos = pos
         self.outer = Rectangle(pos=pos, size=size)
         self.add(self.outer)
+
+        #inner
         self.add(Color(kBgColor[0], kBgColor[1], kBgColor[2], kBgColor[3], mode='rgba'))
-        w = size[0] - 2*thickness
-        h = size[1] - 2*thickness
-        x = pos[0] + thickness
-        y = pos[1] + thickness
+        self.w = size[0] - 2*thickness
+        self.h = size[1] - 2*thickness
+        self.x = pos[0] + thickness
+        self.y = pos[1] + thickness
         self.thickness = thickness
-        self.inner = Rectangle(pos=(x, y), size=(w,h))
+        self.inner = Rectangle(pos=(self.x, self.y), size=(self.w, self.h))
         self.add(self.inner)
+
+        self.beat_lines = []
+
         for i in range(kNumGems):
-            current_x = x + (i + 0.5) * kNumGems ** -1 * w
-            self.add(BeatlineDisplay((current_x, y), h))
+            current_x = self.x + (i + 0.5) * kNumGems ** -1 * self.w
+            bl = BeatlineDisplay((current_x, self.y), self.h)
+            self.add(bl)
+            self.beat_lines.append(bl)
+
+        self.anim_time = 0
+        self.total_time = .1
+        self.pulsing = False
+
+        self.pulse_anim = KFAnim((0, 1), (0.02, 1), (0.05, 1.05), (.1, 1))
+        self.prev_inner_size_anim = (self.w, self.h)
+        self.prev_outer_size_anim = self.outer_size
+
+    def on_update(self, dt):
+
+        #Really only update anything if the box is currently pulsing
+        if self.pulsing:
+
+            #do the pulse animation for every beat line as well
+            for line in self.beat_lines:
+                line.on_update(dt)
+
+            #if there is still room to animate
+            if self.anim_time < self.total_time:
+                self.anim_time += dt
+                delta_size = self.pulse_anim.eval(self.anim_time)
+
+                #change the inner and outer box sizes
+                self.inner.size = (self.w * delta_size, self.h * delta_size)
+                self.outer.size = (self.outer_size[0] * delta_size, self.outer_size[1] * delta_size)
+
+                #differences to shift the box to keep it center
+                inner_diff_x = self.prev_inner_size_anim[0] - self.inner.size[0]
+                inner_diff_y = self.prev_inner_size_anim[1] - self.inner.size[1]
+
+                outer_diff_x = self.prev_outer_size_anim[0] - self.outer.size[0]
+                outer_diff_y = self.prev_outer_size_anim[1] - self.outer.size[1]
+
+                #shift positions to keep it center
+                self.inner.pos = (self.x + inner_diff_x, self.y + inner_diff_y)
+                self.outer.pos = (self.outer_pos[0] + outer_diff_x, self.outer_pos[1] + outer_diff_y)
+
+                #update previous to current
+                self.prev_inner_size_anim = (self.inner.size[0], self.inner.size[1])
+                self.prev_outer_size_anim = (self.outer.size[0], self.outer.size[1])
+
+            elif self.anim_time == self.total_time:
+                self.inner.pos = (self.x, self.y)
+                self.inner.size = (self.w, self.h)
+
+                self.outer.pos = self.outer_pos
+                self.outer.size = self.outer_size
+
+                self.pulsing = False
+                self.anim_time = 0
+
+            else:
+                self.anim_time = self.total_time
+
+        return True
+
+    def pulse(self):
+        self.pulsing = True
+        for line in self.beat_lines:
+            line.pulse()
+        self.anim_time = 0
 
 
 
@@ -227,10 +342,62 @@ class BoxDisplay(InstructionGroup):
 class BeatlineDisplay(InstructionGroup):
     def __init__(self, pos, length):
         super(BeatlineDisplay, self).__init__()
+        self.pos = pos
         self.length = length
         self.add(Color(kBeatlineColor[0], kBeatlineColor[1], kBeatlineColor[2], kBeatlineColor[3], mode='rgba'))
-        self.line = Line(points=(pos[0], pos[1], pos[0], pos[1] + self.length), width=kBeatlineThickness, cap='none')
+        self.line = Line(bezier=(self.pos[0], self.pos[1], self.pos[0], self.pos[1] + .5*self.length, self.pos[0], self.pos[1] + self.length), width=kBeatlineThickness, cap='none')
         self.add(self.line)
+
+        self.anim_time = 0
+        self.total_time = .1
+        self.pulsing = False
+
+        self.pulse_anim = KFAnim((0, 1), (0.02, 1), (0.05, 1.05), (.1, 1))
+
+        self.frames = np.arange(1000)
+        self.vib = 12 * np.sin(2 * np.pi * self.frames / 3) #sine curve for the standing wave
+        self.vibrate_anim = KFAnim(*enumerate([self.vib[i] for i in self.frames])) #animation for pluck position
+
+        self.prev_anim_length = self.length
+
+    def on_update(self, dt):
+
+        #only on-update if pulsing
+        if self.pulsing:
+            if self.anim_time < self.total_time:
+
+                self.anim_time += dt
+                delta_size = self.pulse_anim.eval(self.anim_time)
+
+                #change the length of the beatline to match the box
+                length = self.length * delta_size
+                diff_y = self.prev_anim_length - length
+
+                wave_offset = self.vibrate_anim.eval(1000 * self.anim_time)
+
+                #update the points of the beatline, as well as the width
+                self.line.bezier = [self.pos[0], self.pos[1] + diff_y, self.pos[0] + wave_offset, self.pos[1] + .5*length, self.pos[0], self.pos[1] + length]
+                self.line.width = kBeatlineThickness*2*delta_size
+
+                self.prev_anim_length = length
+
+            elif self.anim_time == self.total_time:
+                self.line.width = kBeatlineThickness
+                self.line.bezier = [self.pos[0], self.pos[1], self.pos[0], self.pos[1] + .5*self.length, self.pos[0], self.pos[1] + self.length]
+
+                self.pulsing = False
+                self.anim_time = 0
+
+            else:
+                self.anim_time = self.total_time
+
+        return True
+
+
+    def pulse(self):
+        self.pulsing = True
+        self.anim_time = 0
+
 
 
 # a vertical line which can move linearly between two x positions
@@ -268,7 +435,6 @@ class MeasureDisplay(InstructionGroup):
     def __init__(self, pos, size, gems):
         super(MeasureDisplay, self).__init__()
 
-        self.size = size
         self.gems = []
         w = int((size[0])*len(gems)**-1)
         h = size[1]
@@ -282,40 +448,32 @@ class MeasureDisplay(InstructionGroup):
             else:
                 self.gems.append(None)
 
-        self.animating = []
+        self.updates = []
 
     # update position and size with animation
     def transform(self, pos, size, animDur=kAnimDur):
-        self.size = size
         self.animating = []
-        for i in range(len(self.gems)):
-            if self.gems[i] != None:
-                x = pos[0] + float(i * size[0])/len(self.gems)
-                y = pos[1]
-                w = int((size[0])*len(self.gems)**-1)
-                h = size[1]
-                self.gems[i].transform((x,y),(w,h), animDur)
-                self.animating.append(self.gems[i])
-
-    # immediately update position without animating
-    def set_pos(self, pos):
-        w = int((self.size[0])*len(self.gems)**-1)
-        h = self.size[1]
-        y = pos[1]
-        for i in range(len(self.gems)):
-            if self.gems[i] != None:
-                x = pos[0] + w*i
-                self.gems[i].set_pos((x,y))
-                self.gems[i].set_size((w,h))
-
-    def set_size(self, size):
-        self.size = size
         w = int((size[0])*len(self.gems)**-1)
+        y = pos[1]
         h = size[1]
         for i in range(len(self.gems)):
             if self.gems[i] != None:
-                self.gems[i].set_size((w,h))
+                x = pos[0] + float(i * size[0])/len(self.gems)
+                self.gems[i].transform((x,y),(w,h), animDur)
 
+                if self.gems[i] not in self.updates:
+                    self.updates.append(self.gems[i])
+
+    # immediately update position without animating
+    def set_pos_size(self, pos, size):
+        w = int((size[0])*len(self.gems)**-1)
+        y = pos[1]
+        h = size[1]
+        for i in range(len(self.gems)):
+            if self.gems[i] != None:
+                x = pos[0] + float(i * size[0])/len(self.gems)
+                self.gems[i].set_pos((x,y))
+                self.gems[i].set_size((w,h))
 
     # get the i'th gem of the measure
     def get_gem(self, gem_idx):
@@ -330,13 +488,11 @@ class MeasureDisplay(InstructionGroup):
 
     # let animating gems animate
     def on_update(self, dt):
-        for gem in self.animating:
-            if gem == None:
-                continue
-            cont = gem.on_update(dt)
+        for elm in self.updates:
+            cont = elm.on_update(dt)
             if not cont:
-                self.animating.remove(gem)
-        return len(self.animating) > 0
+                self.updates.remove(elm)
+        return len(self.updates) > 0
 
 
 class HitParticleDisplay(InstructionGroup):
@@ -400,13 +556,20 @@ class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data, seek):
         super(BeatMatchDisplay, self).__init__()
 
+        self.main_box_display = None
+
         # previews
         for i in range(len(kPreviews), -1, -1):
             y = previewY(i)
             x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness))
             w = kMeasureWidth * (1 if i==0 else kPreviews[i-1]) + 2*kBoxThickness
             h = kMeasureHeight * (1 if i==0 else kPreviews[i-1]) + 2*kBoxThickness
-            self.add(BoxDisplay(pos=(x, y), size=(w,h), thickness=kBoxThickness))
+            bd = BoxDisplay(pos=(x, y), size=(w,h), thickness=kBoxThickness)
+            self.add(bd)
+
+            if i == 0:
+                self.main_box_display = bd
+
         # nowbar for active measure (i = 0 right now)
         self.nbd = NowbarDisplay(kLeftX+kBoxThickness/2, kLeftX+kMeasureWidth+kBoxThickness/2, y, y+h)
         self.add(self.nbd)
@@ -461,8 +624,7 @@ class BeatMatchDisplay(InstructionGroup):
             x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
             w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
             h = kMeasureHeight * (1 if i==0 else kPreviews[i-1])
-            self.bars[self.current_bar + i].set_size((w, h))
-            self.bars[self.current_bar + i].set_pos((x, y))
+            self.bars[self.current_bar + i].set_pos_size((x,y), (w, h))
             self.add(self.bars[self.current_bar + i])
 
     # stop displaying current measure, move preivews up, add next preview measure
@@ -475,13 +637,16 @@ class BeatMatchDisplay(InstructionGroup):
         animDur = self.bar_durations[self.current_bar]*(2*kNumGems)**-1
         self.current_bar += 1
         # move preview measures up
-        for i in range(min(len(kPreviews)+1, len(self.bars) - self.current_bar - 1)):
+        for i in range(min(len(kPreviews) + 1, len(self.bars) - self.current_bar - 1)):
             y = previewY(i) + kBoxThickness
             x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
             w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
             h = kMeasureHeight * (1 if i==0 else kPreviews[i-1])
             self.bars[self.current_bar + i].transform((x, y), (w,h), animDur)
-            self.updates.append(self.bars[self.current_bar + i])
+
+            if self.bars[self.current_bar + i] not in self.updates:
+                self.updates.append(self.bars[self.current_bar + i])
+
         # add new preview measure
         if self.current_bar + len(kPreviews) < len(self.bars):
             self.add(self.bars[self.current_bar + len(kPreviews)])
@@ -492,7 +657,15 @@ class BeatMatchDisplay(InstructionGroup):
             bar, idx = self.__find_gem(gem_idx)
             gem, i = bar.get_gem(idx)
             gem.on_hit()
+
+            if bar not in self.updates:
+                self.updates.append(bar)
+
+            if gem not in bar.updates:
+                bar.updates.append(gem)
+
             self.hpd.puff(i)
+            self.main_box_display.pulse()
 
     def gem_miss(self, gem_idx):
         bar, idx = self.__find_gem(gem_idx)
@@ -541,6 +714,7 @@ class BeatMatchDisplay(InstructionGroup):
                 self.updates.remove(elm)
 
         self.hpd.on_update(dt)
+        self.main_box_display.on_update(dt)
 
 # HELPER FUNCTIONS
 # returns a linear function f(x) given two points (x0, y0) and (x1, y1)
