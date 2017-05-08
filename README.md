@@ -14,3 +14,8 @@ kick, snare, hihat: Artem Kovyazin
 
 Font Credit
 CevicheOne: Miguel Hernandez; downloaded from Google Fonts
+
+Acknowledgements:
+"Automatic classification of drum sounds: a comparison of feature selection methods and classification techniques"
+*Herrera et. al.*
+[link to paper](http://www.music.mcgill.ca/~ich/classes/mumt614/similarity/herrera02automatic.pdf)
