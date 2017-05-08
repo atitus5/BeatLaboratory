@@ -146,12 +146,14 @@ class GemDisplay(InstructionGroup):
         self.pos = pos
         self.target_pos = pos
 
+    # immediately change the gem's size without animating
     def set_size(self, size):
         self.gem.size = size
         self.size = size
         self.target_size = size
 
-    def transform(self, pos, size, animDur = kAnimDur):
+    # gradually change the gem's position and size over animDur seconds
+    def transform(self, pos, size, animDur=kAnimDur):
         self.target_pos = pos
         self.target_size = size
         self.time = 0
@@ -254,7 +256,6 @@ class MeasureDisplay(InstructionGroup):
     def __init__(self, pos, size, gems):
         super(MeasureDisplay, self).__init__()
 
-        self.size = size
         self.gems = []
         w = int((size[0])*len(gems)**-1)
         h = size[1]
@@ -272,7 +273,6 @@ class MeasureDisplay(InstructionGroup):
 
     # update position and size with animation
     def transform(self, pos, size, animDur=kAnimDur):
-        self.size = size
         self.animating = []
         for i in range(len(self.gems)):
             if self.gems[i] != None:
@@ -284,22 +284,14 @@ class MeasureDisplay(InstructionGroup):
                 self.animating.append(self.gems[i])
 
     # immediately update position without animating
-    def set_pos(self, pos):
-        w = int((self.size[0])*len(self.gems)**-1)
-        h = self.size[1]
-        y = pos[1]
-        for i in range(len(self.gems)):
-            if self.gems[i] != None:
-                x = pos[0] + w*i
-                self.gems[i].set_pos((x,y))
-                self.gems[i].set_size((w,h))
-
-    def set_size(self, size):
-        self.size = size
+    def set_pos_size(self, pos, size):
         w = int((size[0])*len(self.gems)**-1)
+        y = pos[1]
         h = size[1]
         for i in range(len(self.gems)):
             if self.gems[i] != None:
+                x = pos[0] + float(i * size[0])/len(self.gems)
+                self.gems[i].set_pos((x,y))
                 self.gems[i].set_size((w,h))
 
 
@@ -447,8 +439,7 @@ class BeatMatchDisplay(InstructionGroup):
             x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
             w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
             h = kMeasureHeight * (1 if i==0 else kPreviews[i-1])
-            self.bars[self.current_bar + i].set_size((w, h))
-            self.bars[self.current_bar + i].set_pos((x, y))
+            self.bars[self.current_bar + i].set_pos_size((x,y), (w, h))
             self.add(self.bars[self.current_bar + i])
 
     # stop displaying current measure, move preivews up, add next preview measure
@@ -461,7 +452,7 @@ class BeatMatchDisplay(InstructionGroup):
         animDur = self.bar_durations[self.current_bar]*(2*kNumGems)**-1
         self.current_bar += 1
         # move preview measures up
-        for i in range(min(len(kPreviews)+1, len(self.bars) - self.current_bar - 1)):
+        for i in range(min(len(kPreviews) + 1, len(self.bars) - self.current_bar - 1)):
             y = previewY(i) + kBoxThickness
             x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
             w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
