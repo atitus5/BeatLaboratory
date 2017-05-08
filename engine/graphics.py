@@ -1,3 +1,5 @@
+import numpy as np
+
 # CONSTANTS
 # sreen padding
 kLeftX = 20 # left screen padding
@@ -16,26 +18,34 @@ kTextColor = (242 / 256.0, 242 / 256.0, 242 / 256.0, 0.9)  # Slightly off-white
 kBgColor = (13 / 256.0, 26 / 256.0, 38 / 256.0, 0.8) # dark blue
 kBeatlineColor = (1,1,1,.5)
 # gem image filepaths
-kImages = [
+kImages = (
     '../data/kick.png',
     '../data/hihat.png',
     '../data/snare.png'
-]
+)
 kFontPath = "../data/CevicheOne-Regular.ttf"
 kTitleFontSize = .8 * kTopY
 kBottomFontSize = 0.7 * kBottomY
 kReplaceMe = 100
 kAnimDur = .25 # number of seconds animations take
+kHitAnimDur = .25 # number of seconds hit animations take
+
 
 
 # graphics that indirectly affect gameplay
 kNumGems = 8 # numbber of gems allowed per bar
-kNumPreviews = 2 # number of measures ahead shown
-kPreviewScale = 2*3**-1 # previews are this fraction of full size (<= 1)
+kPreviews = np.array([2**i*3**-i for i in range(1,7)])
 
 # these are just convenient
-kWindowWidth = (kNumGems * kGemWidth) + (2 * kBoxThickness) + kLeftX + kRightX
-kWindowHeight = int((kNumPreviews*kPreviewScale+1)*(kGemHeight + 2*kBoxThickness)) + (kNumPreviews)*kMeasureSpacing + kBottomY + kTopY
+kMeasureWidth = kNumGems * kGemWidth
+kMeasureHeight = kGemHeight
+kWindowWidth = kMeasureWidth + (2 * kBoxThickness) + kLeftX + kRightX
+kWindowHeight =  int(sum(kMeasureHeight*kPreviews)) + len(kPreviews)*kMeasureSpacing + (len(kPreviews)+1)*2*kBoxThickness + kMeasureHeight + kBottomY + kTopY
+# function to calculate y coordinate of preview i (0 for active measure)
+def previewY(i):
+    if i >= len(kPreviews):
+        return kBottomY
+    return sum(kMeasureHeight*kPreviews[i:]) + (len(kPreviews)-i)*(kMeasureSpacing + 2*kBoxThickness) + kBottomY
 
 
 # IMPORTS
@@ -55,6 +65,8 @@ from kivy.core.image import Image
 from kivy.core.window import Window
 from kivy.uix.popup import Popup
 
+from common.kivyparticle import ParticleSystem
+
 # set background of screen
 Window.clearcolor = kBgColor
 
@@ -68,7 +80,6 @@ kTitleFontSize = 0.9 * kTopY
 kTopFontSize = 0.6 * kTopY
 
 from common.gfxutil import *
-import numpy as np
 
 
 # GRAPHICS
@@ -136,6 +147,7 @@ class GemDisplay(InstructionGroup):
         self.target_pos = pos
         self.target_size = size
         self.time = 0
+        self.animDur = kAnimDur
         self.animating = False
 
     # immediately change the gem's position without animating
@@ -151,11 +163,12 @@ class GemDisplay(InstructionGroup):
         self.size = size
         self.target_size = size
 
-    def transform(self, pos, size):
+    def transform(self, pos, size, animDur = kAnimDur):
         self.target_pos = pos
         self.target_size = size
         self.time = 0
         self.animating = True
+        self.animDur = animDur
 
     # change to display this gem being hit
     def on_miss(self):
@@ -169,9 +182,9 @@ class GemDisplay(InstructionGroup):
     def on_update(self, dt):
         if self.animating:
             self.time += dt
-            if self.time > kAnimDur:
-                self.time = kAnimDur
-            progress = (self.time * kAnimDur**-1)
+            if self.time > self.animDur:
+                self.time = self.animDur
+            progress = (self.time * self.animDur**-1)
             x = progress * (self.target_pos[0] - self.pos[0]) + self.pos[0]
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
@@ -271,7 +284,7 @@ class MeasureDisplay(InstructionGroup):
         self.animating = []
 
     # update position and size with animation
-    def transform(self, pos, size):
+    def transform(self, pos, size, animDur=kAnimDur):
         self.size = size
         self.animating = []
         for i in range(len(self.gems)):
@@ -280,7 +293,7 @@ class MeasureDisplay(InstructionGroup):
                 y = pos[1]
                 w = int((size[0])*len(self.gems)**-1)
                 h = size[1]
-                self.gems[i].transform((x,y),(w,h))
+                self.gems[i].transform((x,y),(w,h), animDur)
                 self.animating.append(self.gems[i])
 
     # immediately update position without animating
@@ -305,8 +318,14 @@ class MeasureDisplay(InstructionGroup):
 
     # get the i'th gem of the measure
     def get_gem(self, gem_idx):
-        filtered_gems = filter(lambda x : x != None, self.gems)
-        return filtered_gems[gem_idx]
+        for i in range(len(self.gems)):
+            if self.gems[i] == None:
+                continue
+            if gem_idx == 0:
+                return self.gems[i], i
+            gem_idx -= 1
+        print "warning: requested gem out of measure bounds"
+        return None, None
 
     # let animating gems animate
     def on_update(self, dt):
@@ -319,38 +338,86 @@ class MeasureDisplay(InstructionGroup):
         return len(self.animating) > 0
 
 
+class HitParticleDisplay(InstructionGroup):
+    def __init__(self, pos, size):
+        super(HitParticleDisplay, self).__init__()
+        # particle systems on active measure
+        self.m_psystems = []
+        self.m_hit_times = [-1]
+        for i in range(kNumGems):
+            ps = ParticleSystem('../particle/particle1.pex')
+            ps.emitter_x = pos[0] + (i + 0.5) * kNumGems ** -1 * size[0]
+            ps.emitter_y = pos[1] + .5*size[1]
+            self.m_psystems.append(ps)
+            self.m_hit_times.append(-1)
+
+        # particle systems on bottom corners of screen
+        self.bl = ParticleSystem('../particle/particle2.pex')
+        self.bl.emitter_x = 0
+        self.bl.emitter_y = 0
+        self.bl.emit_angle = np.pi*4**-1
+        self.br = ParticleSystem('../particle/particle2.pex')
+        self.br.emitter_x = kWindowWidth-1
+        self.br.emitter_y = 0
+        self.br.emit_angle = 3*np.pi*4**-1
+        self.b_hit_time = -1
+
+
+    def puff(self, i):
+        if i < 0 or i > len(self.m_psystems):
+            print "warning: ps puff out of bounds"
+            return
+        self.m_psystems[i].start()
+        self.m_hit_times[i] = 0
+        self.bl.start()
+        self.br.start()
+        self.b_hit_time = 0
+
+    def install_particle_systems(self, widget):
+        for ps in self.m_psystems:
+            widget.add_widget(ps)
+        widget.add_widget(self.bl)
+        widget.add_widget(self.br)
+
+    def on_update(self, dt):
+        for i in range(len(self.m_hit_times)):
+            if self.m_hit_times[i] >= 0:
+                self.m_hit_times[i] += dt
+            if self.m_hit_times[i] >= kHitAnimDur:
+                self.m_hit_times[i] = -1
+                self.m_psystems[i].stop()
+        if self.b_hit_time >= 0:
+            self.b_hit_time += dt
+        if self.b_hit_time >= kHitAnimDur:
+            self.b_hit_time = -1
+            self.bl.stop()
+            self.br.stop()
+
+
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
 class BeatMatchDisplay(InstructionGroup):
     def __init__(self, song_data, seek):
         super(BeatMatchDisplay, self).__init__()
 
-        w = kNumGems * kGemWidth + 2*kBoxThickness
-        h = kGemHeight + 2*kBoxThickness
-        pre_w = int(kPreviewScale * kNumGems * kGemWidth) + 2*kBoxThickness
-        pre_h = int(kPreviewScale * kGemHeight) + 2*kBoxThickness
-        preLeftX = kLeftX + (1-kPreviewScale) * w * .5
         # previews
-        for i in range(1, kNumPreviews+1):
-            y = kBottomY + (kNumPreviews - i) * (pre_h + kMeasureSpacing)
-            self.add(BoxDisplay(pos=(preLeftX, y), size=(pre_w,pre_h), thickness=int(kBoxThickness*kPreviewScale)))
-        # box and nowbar for active measure
-        y = kBottomY + kNumPreviews * (pre_h + kMeasureSpacing)
-        self.add(BoxDisplay(pos=(kLeftX, y), size=(w,h), thickness=kBoxThickness))
-        self.nbd = NowbarDisplay(kLeftX+kBoxThickness/2, kLeftX+w-kBoxThickness/2, y, y+h)
+        for i in range(len(kPreviews), -1, -1):
+            y = previewY(i)
+            x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness))
+            w = kMeasureWidth * (1 if i==0 else kPreviews[i-1]) + 2*kBoxThickness
+            h = kMeasureHeight * (1 if i==0 else kPreviews[i-1]) + 2*kBoxThickness
+            self.add(BoxDisplay(pos=(x, y), size=(w,h), thickness=kBoxThickness))
+        # nowbar for active measure (i = 0 right now)
+        self.nbd = NowbarDisplay(kLeftX+kBoxThickness/2, kLeftX+kMeasureWidth+kBoxThickness/2, y, y+h)
         self.add(self.nbd)
+        self.hpd = HitParticleDisplay((x+kBoxThickness,y+kBoxThickness), (w-kBoxThickness, h-kBoxThickness))
 
         # tracks which measures are animating
-        self.measure_updates = []
+        self.updates = []
 
         # process song data to pre-generate bar graphics
         self.bars = []
         self.bar_durations = []
         self.bar_num_gems = []
-        act_w = kNumGems * kGemWidth
-        act_h = kGemHeight
-        pre_w = int(kPreviewScale * kNumGems * kGemWidth)
-        pre_h = int(kPreviewScale * kGemHeight)
-        preLeftX = kLeftX + (1-kPreviewScale) * act_w * .5
         i = 1
         j = 0
         while i < len(song_data.barlines):
@@ -388,11 +455,11 @@ class BeatMatchDisplay(InstructionGroup):
         self.bar_dur = seek - max(temp_l) if temp_l else 0.0
 
         # show intial graphics
-        for i in range(min(kNumPreviews + 1, len(self.bars) - self.current_bar - 1)):
-            x = (kLeftX if i==0 else preLeftX) + kBoxThickness
-            y = kBottomY + (kNumPreviews - i) * (pre_h + 2*kBoxThickness + kMeasureSpacing) + kBoxThickness
-            w = act_w if i == 0 else pre_w
-            h = act_h if i == 0 else pre_h
+        for i in range(min(len(kPreviews) + 1, len(self.bars) - self.current_bar - 1)):
+            y = previewY(i) + kBoxThickness
+            x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
+            w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
+            h = kMeasureHeight * (1 if i==0 else kPreviews[i-1])
             self.bars[self.current_bar + i].set_size((w, h))
             self.bars[self.current_bar + i].set_pos((x, y))
             self.add(self.bars[self.current_bar + i])
@@ -404,41 +471,45 @@ class BeatMatchDisplay(InstructionGroup):
         self.remove(self.bars[self.current_bar])
         # update current measure
         self.gem_offset += self.bar_num_gems[self.current_bar]
+        animDur = self.bar_durations[self.current_bar]*(2*kNumGems)**-1
         self.current_bar += 1
         # move preview measures up
-        act_w = kNumGems * kGemWidth
-        act_h = kGemHeight
-        pre_w = int(kPreviewScale * kNumGems * kGemWidth)
-        pre_h = int(kPreviewScale * kGemHeight)
-        preLeftX = kLeftX + (1-kPreviewScale) * act_w * .5
-        for i in range(min(kNumPreviews+1, len(self.bars) - self.current_bar - 1)):
-            x = (kLeftX if i == 0 else preLeftX) + kBoxThickness
-            y = kBottomY + (kNumPreviews - i) * (pre_h + 2*kBoxThickness + kMeasureSpacing) + kBoxThickness
-            w = act_w if i == 0 else pre_w
-            h = act_h if i == 0 else pre_h
-            self.bars[self.current_bar + i].transform((x, y), (w,h))
-            self.measure_updates.append(self.bars[self.current_bar + i])
+        for i in range(min(len(kPreviews)+1, len(self.bars) - self.current_bar - 1)):
+            y = previewY(i) + kBoxThickness
+            x = kLeftX + (0 if i==0 else .5 * (1-kPreviews[i-1]) * (kMeasureWidth+2*kBoxThickness)) + kBoxThickness
+            w = kMeasureWidth * (1 if i==0 else kPreviews[i-1])
+            h = kMeasureHeight * (1 if i==0 else kPreviews[i-1])
+            self.bars[self.current_bar + i].transform((x, y), (w,h), animDur)
+            self.updates.append(self.bars[self.current_bar + i])
         # add new preview measure
-        if self.current_bar + kNumPreviews < len(self.bars):
-            self.add(self.bars[self.current_bar + kNumPreviews])
+        if self.current_bar + len(kPreviews) < len(self.bars):
+            self.add(self.bars[self.current_bar + len(kPreviews)])
 
     # called by player, sends gem hit to correct measure
     def gem_hit(self, gem_idx):
         if self.__find_gem(gem_idx) != None:
-            self.__find_gem(gem_idx).on_hit()
+            bar, idx = self.__find_gem(gem_idx)
+            gem, i = bar.get_gem(idx)
+            gem.on_hit()
+            self.hpd.puff(i)
 
     def gem_miss(self, gem_idx):
-        if self.__find_gem(gem_idx) != None:
-            self.__find_gem(gem_idx).on_miss()
+        bar, idx = self.__find_gem(gem_idx)
+        gem, i = bar.get_gem(idx)
+        if gem != None:
+            gem.on_miss()
 
     def __find_gem(self, gem_idx):
         # this logic assumes gem hit will never be given more than +/- 1 bar early/late
         if 0 <= (gem_idx - self.gem_offset) < self.bar_num_gems[self.current_bar]:
-            return self.bars[self.current_bar].get_gem(gem_idx - self.gem_offset)
+            return self.bars[self.current_bar], gem_idx - self.gem_offset
         elif (gem_idx - self.gem_offset) < 0:
-            return self.bars[self.current_bar-1].get_gem(gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1]))
+            return self.bars[self.current_bar-1], gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1])
         else:
-            return self.bars[self.current_bar+1].get_gem(gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar]))
+            return self.bars[self.current_bar+1], gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar])
+
+    def install_particle_systems(self, widget):
+        self.hpd.install_particle_systems(widget)
 
     # call every frame to move nowbar and check if measures need updating
     def on_update(self, dt):
@@ -463,11 +534,12 @@ class BeatMatchDisplay(InstructionGroup):
             progress = 0
         self.nbd.set_progress(progress)
 
-        for measure in self.measure_updates:
-            animate = measure.on_update(dt)
-            if not animate:
-                self.measure_updates.remove(measure)
+        for elm in self.updates:
+            cont = elm.on_update(dt)
+            if not cont:
+                self.updates.remove(elm)
 
+        self.hpd.on_update(dt)
 
 # HELPER FUNCTIONS
 # returns a linear function f(x) given two points (x0, y0) and (x1, y1)

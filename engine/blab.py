@@ -43,7 +43,6 @@ song_path = '../data/24KMagicNoDrums' # could make command argument in future
 train_song_path = '../data/training' # could make command argument in future
 
 
-
 # MAIN WIDGET
 class MainWidget(BaseWidget) :
     def __init__(self):
@@ -87,6 +86,7 @@ class MainWidget(BaseWidget) :
         self.clock.stop()
         self.now = 0
 
+        # Set up microphone input handling
         if usemic:
             # Set up microphone input handling and training
             slop_frames = int(kSlopWindow * kSampleRate)
@@ -117,6 +117,7 @@ class MainWidget(BaseWidget) :
         # graphics
         self.bmd = BeatMatchDisplay(self.train_song_data, 0)
         self.canvas.add(self.bmd)
+        self.bmd.install_particle_systems(self)
 
         # gameplay
         self.player = Player(self.train_song_data.gems, self.bmd)
@@ -140,6 +141,7 @@ class MainWidget(BaseWidget) :
         # graphics
         self.bmd = BeatMatchDisplay(self.song_data, seek)
         self.canvas.add(self.bmd)
+        self.bmd.install_particle_systems(self)
 
         # gameplay
         self.player = Player(self.song_data.gems, self.bmd)
@@ -161,7 +163,7 @@ class MainWidget(BaseWidget) :
     def process_mic_input(self, data, num_channels):
         # Send mic input to our handler
         if self.training:
-            self.mic_handler.add_training_data(data, self.current_label)
+            # self.mic_handler.add_training_data(data, self.current_label)
             pass
         else:
             event = self.mic_handler.add_data(data)
@@ -291,7 +293,6 @@ class Player(object):
                 if abs(self.gem_data[i][0] - self.now) < kSlopWindow:
                     if self.gem_data[i][1] == lane:
                         self.display.gem_hit(i)
-                        print 'hit', i
                         self.next_gem += 1
                         self.streak += 1
                         self.score += 1 * min(4, 1 + self.streak/5)
