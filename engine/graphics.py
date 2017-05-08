@@ -136,9 +136,18 @@ class GemDisplay(InstructionGroup):
         self.size = size
         self.target_pos = pos
         self.target_size = size
-        self.time = 0
+
+        self.shift_time = 0
+        self.hit_time = 0
+
         self.animDur = kAnimDur
-        self.animating = False
+        self.deathTime = kHitAnimDur
+
+        self.shift_animating = False
+        self.hit_animating = False
+
+        self.size_anim = KFAnim((0, (self.size[0], self.size[1])), (.5, (1.5*self.size[0], 1.5*self.size[1])), (1, (0, 0)))
+        self.alpha_anim = KFAnim((0, 1), (1, 0))
 
     # immediately change the gem's position without animating
     def set_pos(self, pos):
@@ -154,8 +163,9 @@ class GemDisplay(InstructionGroup):
     def transform(self, pos, size, animDur = kAnimDur):
         self.target_pos = pos
         self.target_size = size
-        self.time = 0
-        self.animating = True
+        self.shift_time = 0
+        self.shift_animating = True
+
         self.animDur = animDur
 
     # change to display this gem being hit
@@ -164,27 +174,43 @@ class GemDisplay(InstructionGroup):
 
     # change to display this gem being hit
     def on_hit(self):
-        self.color.rgba = (1,1,1,0) # invisible
+        # self.color.rgba = (1,1,1,0) # invisible
+        self.hit_time = 0
+        self.hit_animating = True
+
 
     # update position and size of gem if it is animating
     def on_update(self, dt):
-        if self.animating:
-            self.time += dt
-            if self.time > self.animDur:
-                self.time = self.animDur
-            progress = (self.time * self.animDur**-1)
+        if self.shift_animating:
+            self.shift_time += dt
+            if self.shift_time > self.animDur:
+                self.shift_time = self.animDur
+            progress = (self.shift_time * self.animDur**-1)
             x = progress * (self.target_pos[0] - self.pos[0]) + self.pos[0]
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
             self.gem.pos = (x,y)
             self.gem.size = (w,h)
-            if self.time == self.animDur:
+            if self.shift_time == self.animDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
-                self.animating = False
+                self.shift_animating = False
             else:
                 return True
+
+        if self.hit_animating:
+            self.hit_time += dt
+
+            if self.hit_time < self.deathTime:
+                alpha = self.alpha_anim.eval(self.hit_time)
+                w, h = self.size_anim.eval(self.hit_time)
+
+                self.gem.size = (w, h)
+                self.color.a = alpha
+                
+                return True
+
         return False
 
 
