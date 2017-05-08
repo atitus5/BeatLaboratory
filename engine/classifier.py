@@ -23,7 +23,7 @@ kFFTBins = 512
 kEnergyBands = 16
 
 # Read in the Mel frequency filter bank at initialization
-kMelFilterBank = pd.read_csv("mel_filters.csv", sep=",", header=None).as_matrix().T
+kMelFilterBank = pd.read_csv("../engine/mel_filters.csv", sep=",", header=None).as_matrix().T
 
 # Map event classes to labels
 kKick = 0
@@ -86,14 +86,14 @@ class FeatureManager(object):
         self.s_pe = 1.0      # Output; s_pe[n]
         self.s_of = [1.0, -0.97]     # Input;  s_of[n] - 0.97s_of[n - 1]
 
+        '''
         # Set up DCT matrix to convert from MSFCs to MFCCs
         # C_{ij} = cos(pi * i / 23.0 * (j + 0.5)) 
         i_vec = np.asarray(np.multiply(np.pi, range(kNumMFCCs)) / float(kMelFilterBank.shape[0]))
         j_vec = np.asarray(map(lambda j: j + 0.5, range(kMelFilterBank.shape[0])))
         self.dct = np.cos(np.dot(i_vec.reshape((i_vec.size, 1)), j_vec.reshape((1, j_vec.size))))
+        '''
 
-        # Set up a persistant buffer for MFCCs so we don't waste memory
-        self.mfcc_buffer = np.empty(kNumMFCCs, dtype=np.float64)
 
     def compute_features(self, audio_data):
         # Pre-emphasize signal (we need to recognize those snare/hi-hat fricatives!!)
@@ -110,6 +110,7 @@ class FeatureManager(object):
             eps = 1e-9
             mel_energies = np.add(np.multiply(eps, np.ones(len(mel_energies))), mel_energies)
             
+        '''
         mfsc = np.maximum(np.multiply(-50.0, np.ones(kMelFilterBank.shape[0])),
                           np.log(mel_energies))
 
@@ -118,6 +119,7 @@ class FeatureManager(object):
         #         = C * msfc
         mfcc = np.dot(self.dct, mfsc.reshape((mfsc.shape[0], 1)))
         mfcc = mfcc.reshape((mfcc.size))
+        '''
 
         # From Eran's input demo
         zero_crossings = np.count_nonzero(emphasized_audio[1:] * emphasized_audio[:-1] < 0)
@@ -135,7 +137,8 @@ class FeatureManager(object):
         normalized_energies = np.divide(energies, LA.norm(energies))
 
         # Compose feature vector
-        feature_vec = FeatureVector(mfcc=mfcc, energies=normalized_energies, zc=zero_crossings, kurt=kurt)
+        #feature_vec = FeatureVector(mfcc=mfcc, energies=normalized_energies, zc=zero_crossings, kurt=kurt)
+        feature_vec = FeatureVector(energies=normalized_energies, zc=zero_crossings, kurt=kurt)
 
         return feature_vec
 
@@ -145,7 +148,7 @@ class BeatboxClassifier(object):
     def __init__(self):
         super(BeatboxClassifier, self).__init__()
 
-        # TODO: any more setup needed?
+        # No more setup should be necessary?
 
     # Fit our classifier to labels
     def fit(self, feature_arrays, labels):
@@ -164,6 +167,17 @@ class ManualClassifier(BeatboxClassifier) :
         super(ManualClassifier, self).__init__()
 
         # TODO: set up parameters
+
+    # Fit our classifier to labels
+    def fit(self, feature_arrays, labels):
+        # Log features and labels so we can load them in analysis scripts
+        with open("features.pkl", "wb") as fid:
+            cPickle.dump(feature_arrays, fid)
+        with open("labels.pkl", "wb") as fid:
+            cPickle.dump(labels, fid)
+
+        # Defaults to nothing
+        return
 
     # Override so that prediction is, ya know, actually done
     def predict(self, feature_array):
