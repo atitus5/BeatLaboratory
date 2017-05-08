@@ -146,9 +146,8 @@ class GemDisplay(InstructionGroup):
         self.size = size
         self.target_pos = pos
         self.target_size = size
-        self.time = 0
+        self.time = -1
         self.animDur = kAnimDur
-        self.animating = False
 
     # immediately change the gem's position without animating
     def set_pos(self, pos):
@@ -169,7 +168,6 @@ class GemDisplay(InstructionGroup):
         self.target_pos = pos
         self.target_size = size
         self.time = 0
-        self.animating = True
         self.animDur = animDur
 
     # change to display this gem being hit
@@ -182,22 +180,22 @@ class GemDisplay(InstructionGroup):
 
     # update position and size of gem if it is animating
     def on_update(self, dt):
-        if self.animating:
+        if self.time >= 0:
             self.time += dt
-            if self.time > self.animDur:
+            if self.time >= self.animDur:
                 self.time = self.animDur
             progress = (self.time * self.animDur**-1)
             x = progress * (self.target_pos[0] - self.pos[0]) + self.pos[0]
             y = progress * (self.target_pos[1] - self.pos[1]) + self.pos[1]
             w = progress * (self.target_size[0] - self.size[0]) + self.size[0]
             h = progress * (self.target_size[1] - self.size[1]) + self.size[1]
-            if self.gem is not None:
+            if self.gem != None:
                 self.gem.pos = (x,y)
                 self.gem.size = (w,h)
-            if self.time == kAnimDur:
+            if self.time >= self.animDur:
                 self.pos = self.target_pos
                 self.size = self.target_size
-                self.animating = False
+                self.time = -1
             else:
                 return True
         return False
@@ -282,19 +280,19 @@ class MeasureDisplay(InstructionGroup):
             else:
                 self.gems.append(None)
 
-        self.animating = []
+        self.updates = []
 
     # update position and size with animation
     def transform(self, pos, size, animDur=kAnimDur):
         self.animating = []
+        w = int((size[0])*len(self.gems)**-1)
+        y = pos[1]
+        h = size[1]
         for i in range(len(self.gems)):
             if self.gems[i] != None:
                 x = pos[0] + float(i * size[0])/len(self.gems)
-                y = pos[1]
-                w = int((size[0])*len(self.gems)**-1)
-                h = size[1]
                 self.gems[i].transform((x,y),(w,h), animDur)
-                self.animating.append(self.gems[i])
+                self.updates.append(self.gems[i])
 
     # immediately update position without animating
     def set_pos_size(self, pos, size):
@@ -306,7 +304,6 @@ class MeasureDisplay(InstructionGroup):
                 x = pos[0] + float(i * size[0])/len(self.gems)
                 self.gems[i].set_pos((x,y))
                 self.gems[i].set_size((w,h))
-
 
     # get the i'th gem of the measure
     def get_gem(self, gem_idx):
@@ -321,13 +318,11 @@ class MeasureDisplay(InstructionGroup):
 
     # let animating gems animate
     def on_update(self, dt):
-        for gem in self.animating:
-            if gem == None:
-                continue
-            cont = gem.on_update(dt)
+        for elm in self.updates:
+            cont = elm.on_update(dt)
             if not cont:
-                self.animating.remove(gem)
-        return len(self.animating) > 0
+                self.updates.remove(elm)
+        return len(self.updates) > 0
 
 
 class HitParticleDisplay(InstructionGroup):
