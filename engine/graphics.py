@@ -53,6 +53,7 @@ from kivy.graphics import PushMatrix, PopMatrix, Translate, Scale, Rotate
 from kivy.clock import Clock as kivyClock
 from kivy.core.image import Image
 from kivy.core.window import Window
+from kivy.uix.popup import Popup
 
 # set background of screen
 Window.clearcolor = kBgColor
@@ -107,6 +108,10 @@ def topright_label() :
         font_name=kFontPath
         )
     return l
+
+
+# MENUS AND POPUPS
+# TODO
 
 
 #KIVY INSTRUCTION GROUPS
@@ -437,6 +442,9 @@ class BeatMatchDisplay(InstructionGroup):
         if self.bar_dur >= (2*kNumGems-1)*(2*kNumGems)**-1 * self.bar_durations[self.current_bar]:
             self.bar_dur -= self.bar_durations[self.current_bar]
             self.__update_display()
+
+        if self.current_bar >= len(self.bar_durations):
+            return
 
         progress = self.bar_dur * self.bar_durations[self.current_bar]**-1
         progress += (2*kNumGems)**-1 # nowbar goes in middle of gem on exact hit, not front

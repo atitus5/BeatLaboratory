@@ -13,23 +13,24 @@ sys.path.append('..')
 from common.audio import *
 
 
-kChunkSize = int(kSampleRate * 0.025)   # 25 ms
-kFFTBins = 256
+kChunkSize = int(kSampleRate * 0.050)   # 50 ms
+kFFTBins = 32
 
 
 # Used to handle streaming audio input data, quantized to beats in a song, and
 # return events corresponding to beatbox events on each beat
-# NOTE: currently only accepts stereo audio (i.e. num_channels = 2)
+# NOTE: currently only accepts mono audio (i.e. num_channels = 1)
 class MicrophoneHandler(object) :
     def __init__(self, num_channels, slop_frames, mic_buf_size):
         super(MicrophoneHandler, self).__init__()
 
-        assert(num_channels == 2)
+        assert(num_channels == 1)
 
         # Set up audio buffer
         self.slop_frames = slop_frames
         self.mic_buf_size = mic_buf_size
-        self.buf_size = (2 * self.slop_frames) + (2 * mic_buf_size)   # Just in case it overlaps
+        self.buf_size = 2 * self.slop_frames
+        print "Buf size is %d frames (%.3f seconds)" % (self.buf_size, self.buf_size / float(kSampleRate))
         self.buf = np.zeros(self.buf_size, dtype=np.float32)
         self.buf_idx = 0
 
@@ -81,9 +82,6 @@ class MicrophoneHandler(object) :
         # Pre-emphasize signal (we need to recognize those snare/hi-hat fricatives!!)
         emphasized_audio = lfilter(self.s_of, self.s_pe, self.buf)
 
-        # Write sentinel value to our output for beginning
-        print ",".join(map(str, [0.5 for x in xrange((kFFTBins / 2) + 1)]))
-
         # Take real-optimized FFT of each chunk and convert to power
         for chunk in xrange(int(math.ceil(len(emphasized_audio) / float(kChunkSize)))):
             audio_chunk = emphasized_audio[chunk * kChunkSize:(chunk + 1) * kChunkSize]
@@ -91,6 +89,6 @@ class MicrophoneHandler(object) :
             print ",".join(map(str, freq_powers))
 
         # Write sentinel value to our output for end
-        print ",".join(map(str, [0.5 for x in xrange((kFFTBins / 2) + 1)]))
+        print ",".join(map(str, [0.25 for x in xrange((kFFTBins / 2) + 1)]))
 
         return classification
