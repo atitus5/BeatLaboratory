@@ -10,6 +10,7 @@ import numpy.linalg as LA
 import pandas as pd
 from scipy.signal import lfilter
 from scipy.stats import kurtosis
+from sklearn.preprocessing import normalize
 import time
 
 import sys
@@ -18,9 +19,9 @@ sys.path.append('..')
 from common.audio import *
 
 kChunkSize = int(kSampleRate * .050)    # 50 ms
-kNumMFCCs = 13
+kNumMFCCs = 32
 kFFTBins = 512
-kEnergyBands = 16
+kEnergyBands = 23
 
 # Read in the Mel frequency filter bank at initialization
 kMelFilterBank = pd.read_csv("../engine/mel_filters.csv", sep=",", header=None).as_matrix().T
@@ -81,19 +82,15 @@ class FeatureManager(object):
     def __init__(self):
         super(FeatureManager, self).__init__()
 
-        # TODO
         # Set up pre-emphasis filter coefficients
         self.s_pe = 1.0      # Output; s_pe[n]
         self.s_of = [1.0, -0.97]     # Input;  s_of[n] - 0.97s_of[n - 1]
 
-        '''
         # Set up DCT matrix to convert from MSFCs to MFCCs
         # C_{ij} = cos(pi * i / 23.0 * (j + 0.5)) 
         i_vec = np.asarray(np.multiply(np.pi, range(kNumMFCCs)) / float(kMelFilterBank.shape[0]))
         j_vec = np.asarray(map(lambda j: j + 0.5, range(kMelFilterBank.shape[0])))
         self.dct = np.cos(np.dot(i_vec.reshape((i_vec.size, 1)), j_vec.reshape((1, j_vec.size))))
-        '''
-
 
     def compute_features(self, audio_data):
         # Pre-emphasize signal (we need to recognize those snare/hi-hat fricatives!!)
@@ -102,15 +99,21 @@ class FeatureManager(object):
         # Take real-optimized FFT of emphasized audio signal
         spectrum = np.fft.rfft(emphasized_audio, n=kFFTBins)
 
+        # Log frame energy of DC-filtered (NOT pre-emphasis) signal
+        dc_filtered = audio_data - np.mean(audio_data)
+        fe = sum([dc_filtered[i] ** 2 for i in xrange(len(dc_filtered))])
+        lfe = max(-50.0, np.log(fe))
+
         # Compute Mel-frequency Spectral Coefficients (MFSCs)
         abs_spectrum = np.asarray(map(abs, spectrum)).T
         mel_energies = np.dot(kMelFilterBank, abs_spectrum)
+        '''
         if np.count_nonzero(mel_energies) < len(mel_energies):
             # We're going to divide by zero... add a tiny epsilon to the energies
             eps = 1e-9
             mel_energies = np.add(np.multiply(eps, np.ones(len(mel_energies))), mel_energies)
-            
         '''
+            
         mfsc = np.maximum(np.multiply(-50.0, np.ones(kMelFilterBank.shape[0])),
                           np.log(mel_energies))
 
@@ -119,13 +122,9 @@ class FeatureManager(object):
         #         = C * msfc
         mfcc = np.dot(self.dct, mfsc.reshape((mfsc.shape[0], 1)))
         mfcc = mfcc.reshape((mfcc.size))
-        '''
 
         # From Eran's input demo
         zero_crossings = np.count_nonzero(emphasized_audio[1:] * emphasized_audio[:-1] < 0)
-
-        # Compute spectral kurtosis (spectra with distinct peaks have larger values than scattered ones)
-        kurt = abs(kurtosis(spectrum))
 
         # Compute normalized energies in subsets of Mel bands
         energies = []
@@ -134,11 +133,16 @@ class FeatureManager(object):
             band_start = int(i * band_size)
             band_end = int((i + 1) * band_size)
             energies.append(sum(mel_energies[band_start:band_end]))
-        normalized_energies = np.divide(energies, LA.norm(energies))
+        # normalized_energies = np.divide(energies, LA.norm(energies))
+        normalized_energies = normalize(np.reshape(energies, (1, -1)), axis=1, norm="l1")
+
+        # normalize spectrum
+        normalized_spectrum = normalize(abs_spectrum.reshape(1, -1), axis=1, norm="l1")
 
         # Compose feature vector
-        #feature_vec = FeatureVector(mfcc=mfcc, energies=normalized_energies, zc=zero_crossings, kurt=kurt)
-        feature_vec = FeatureVector(energies=normalized_energies, zc=zero_crossings, kurt=kurt)
+        feature_vec = FeatureVector(normalized_spectrum=np.reshape(normalized_spectrum, (normalized_spectrum.shape[1])),
+                                    lfe=lfe,
+                                    zc=zero_crossings)
 
         return feature_vec
 

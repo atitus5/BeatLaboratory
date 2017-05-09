@@ -24,42 +24,59 @@ with open(labels_filename, "rb") as fid:
 # Normalize rows
 normalized_features = normalize(features, axis=0, norm="l1")
 
-f, axes = plt.subplots(1, 4)
-
-# Plot feature spectrograms for kick
+# Order spectrogram by classification type
 kick_features = []
-for i in xrange(labels.shape[0]):
+hihat_features = []
+snare_features = []
+silence_features = []
+total_events = labels.shape[0]
+
+kFeatureStart = 0
+# kFeatureEnd = normalized_features.shape[1]
+kFeatureEnd = (kFFTBins / 2) + 1
+
+for i in xrange(total_events):
     label = labels[i]
     if label == kKick:
-        kick_features.append(normalized_features[i, :])
-axes[0].pcolor(kick_features, cmap="gnuplot2")
-axes[0].set_title("Kick")
+        kick_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+    elif label == kSnare:
+        snare_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+    '''
+    elif label == kHihat:
+        hihat_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+    elif label == kSilence:
+        silence_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+    '''
+kick_features = np.asarray(kick_features)
+hihat_features = np.asarray(hihat_features)
+snare_features = np.asarray(snare_features)
+silence_features = np.asarray(silence_features)
+padding = np.zeros((1, kFeatureEnd - kFeatureStart))
 
-# Plot feature spectrograms for hihat
-hihat_features = []
-for i in xrange(labels.shape[0]):
-    label = labels[i]
-    if label == kHihat:
-        hihat_features.append(normalized_features[i, :])
-axes[1].pcolor(hihat_features, cmap="gnuplot2")
-axes[1].set_title("Hihat")
 
-# Plot feature spectrograms for snare
-snare_features = []
-for i in xrange(labels.shape[0]):
-    label = labels[i]
-    if label == kSnare:
-        snare_features.append(normalized_features[i, :])
-axes[2].pcolor(snare_features, cmap="gnuplot2")
-axes[2].set_title("Snare")
+high_freq_start = 76
+print "Average high freq spectral sum for kick: %.6f" % np.mean([sum(kick_features[i, high_freq_start:] for i in xrange(kick_features.shape[0]))])
+print "Average high freq spectral sum for snare: %.6f" % np.mean([sum(snare_features[i, high_freq_start:] for i in xrange(snare_features.shape[0]))])
 
-# Plot feature spectrograms for silence
-silence_features = []
-for i in xrange(labels.shape[0]):
-    label = labels[i]
-    if label == kSilence:
-        silence_features.append(normalized_features[i, :])
-axes[3].pcolor(silence_features, cmap="gnuplot2")
-axes[3].set_title("Silence")
+'''
+ordered_features = np.concatenate((kick_features, padding,
+                                   hihat_features, padding,
+                                   snare_features, padding,
+                                   silence_features))
+'''
+ordered_features = np.concatenate((kick_features, padding,
+                                   snare_features))
 
+y_labels = ["" for i in xrange(total_events)]
+y_labels[0] = "Kick"
+y_labels[kick_features.shape[0] + 1] = "Snare"
+'''
+y_labels[kick_features.shape[0] + 1] = "Hihat"
+y_labels[kick_features.shape[0] + 1 + hihat_features.shape[0] + 1] = "Snare"
+y_labels[kick_features.shape[0] + 1 + hihat_features.shape[0] + 1 + snare_features.shape[0] + 1] = "Silence"
+'''
+
+plt.pcolor(ordered_features, cmap="gnuplot2")
+plt.yticks(np.arange(0, len(y_labels), 1))
+plt.gca().set_yticklabels(y_labels)
 plt.show()

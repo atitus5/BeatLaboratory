@@ -173,20 +173,21 @@ class MainWidget(BaseWidget) :
                 self.player.on_button_down(button_idx)
 
     def process_mic_input(self, data, num_channels):
-        # Send mic input to our handler
-        if self.training:
-            self.mic_handler.add_training_data(data, self.current_label)
+        if self.mic_handler.processing_audio:
+            # Send mic input to our handler
+            if self.training:
+                self.mic_handler.add_training_data(data, self.current_label)
 
-            if not self.mic_handler.processing_audio:
-                # Send a "no-event" event so that next_gem is updated properly
-                self.player.on_event(kNoEvent)
-        else:
-            start_t = time.time()
-            label = self.mic_handler.add_data(data)
-            event = kLabelToEvent[label]
-            if event is not kNoEvent:
-                print label
-                self.player.on_event(event)
+                if not self.mic_handler.processing_audio:
+                    # Send a "no-event" event so that next_gem is updated properly
+                    self.player.on_event(kNoEvent)
+            else:
+                start_t = time.time()
+                label = self.mic_handler.add_data(data)
+                event = kLabelToEvent[label]
+                if event is not kNoEvent:
+                    print label
+                    self.player.on_event(event)
 
     def on_update(self) :
         dt = self.clock.get_time() - self.now
@@ -228,11 +229,11 @@ class MainWidget(BaseWidget) :
                     time_gap = self.player.gem_data[self.player.next_gem][0] - self.player.now
                     gem_in_window = abs(time_gap) < kSlopWindow
                     if gems_active and gem_in_window:
-                        process_audio = True
+                        # We're ready to gooooo
+                        self.mic_handler.processing_audio = True
                         self.current_label = self.player.gem_data[self.player.next_gem][1]
 
-                if process_audio:
-                    self.mic_audio.on_update()
+                self.mic_audio.on_update()
 
 
 # PARSE DATA (gems & barlines)
