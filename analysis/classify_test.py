@@ -111,15 +111,16 @@ for i in xrange(total_events):
         correct += 1
 print "Extremely Randomized Trees accuracy: %.3f" % (correct / float(total_events))
 
-# Classify using nearest neighbors
-from sklearn import neighbors
-for neighbor_count in xrange(1, 10):
-    clf = neighbors.KNeighborsClassifier(n_neighbors=neighbor_count)
-    clf.fit(features_scaled, labels)
-    correct = 0
-    for i in xrange(total_events):
-        label = labels[i]
-        classification = clf.predict([features_scaled[i, :]])[0]
-        if classification == label:
-            correct += 1
-    print "%d-Nearest Neighbors accuracy: %.3f" % (neighbor_count, (correct / float(total_events)))
+# Classify using gradient boosted regression trees
+from sklearn import ensemble
+clf = ensemble.GradientBoostingClassifier()
+clf.fit(features_scaled, labels)
+correct = 0
+for i in xrange(total_events):
+    label = labels[i]
+    classification = clf.predict([features_scaled[i, :]])[0]
+    if classification == label:
+        correct += 1
+print "GBRT accuracy: %.3f" % (correct / float(total_events))
+
+

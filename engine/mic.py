@@ -41,7 +41,8 @@ class MicrophoneHandler(object) :
 
         # Store data for training the classifier
         self.training_data = []     # 2D array of (features, label) rows
-        self.classifier = ManualClassifier()     # For now, use classifier with handtuned parameters
+        # self.classifier = ManualClassifier()     # For now, use classifier with handtuned parameters
+        self.classifier = GBRTClassifier()
 
     # Receive data and send back a feature vector for the current window, if buffer fills
     def add_training_data(self, data, label):
@@ -92,7 +93,7 @@ class MicrophoneHandler(object) :
 
     # Receive data and send back a string indicating the event that occurred, if requested.
     # Returns empty string if no event occurred
-    def add_data(self, data):
+    def add_data(self, data, label):
         event = ""
 
         # Start processing audio again, if we aren't already
@@ -105,8 +106,15 @@ class MicrophoneHandler(object) :
             self.buf[self.buf_idx:] = np.multiply(data[:self.buf_size - self.buf_idx], self.window[self.buf_idx:])
             self.buf_idx = 0
 
+            # Get features (in the format our classifier expects)
+            feature_vec = self.feature_manager.compute_features(self.buf).asarray()
+
+            # Update our model as we go, if the classifier supports it
+            if self.classifier.supports_partial_fit():
+                self.classifier.partial_fit(feature_vec, label)
+
             # Classify the event now that we have a full buffer
-            event = self._classify_event()
+            event = self._classify_event(feature_vec)
 
             # Clear buffer out
             # NOTE: not strictly necessary, since it is overwritten later --- feel free
@@ -123,11 +131,8 @@ class MicrophoneHandler(object) :
         return event
 
     # Takes our full buffer of windowed data and classifies it as an appropriate beatbox sound
-    def _classify_event(self):
-        # Get features (in the format our classifier expects)
-        feature_vec = self.feature_manager.compute_features(self.buf).asarray()
-
+    def _classify_event(self, feature_vec):
         # Classify it! (Woah, that's what this line of code does?!)
         classification = self.classifier.predict(feature_vec)
-
-        return classification
+        label = kEventToLabel[classification]
+        return label

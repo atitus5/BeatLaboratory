@@ -10,7 +10,8 @@ import numpy.linalg as LA
 import pandas as pd
 from scipy.signal import lfilter
 from scipy.stats import kurtosis
-from sklearn.preprocessing import normalize
+from sklearn.preprocessing import normalize, scale
+from sklearn.ensemble import *
 import time
 
 import sys
@@ -159,10 +160,20 @@ class BeatboxClassifier(object):
         # Defaults to nothing
         return
 
+    def supports_partial_fit(self):
+        # Defaults to false
+        return False
+
+    # Update our model with a new feature array. Not possible for all 
+    def partial_fit(self, feature_arrays, labels):
+        # Defaults to an exception
+        raise Exception("partial_fit not supported by this classifier")
+
     # Takes a feature vector and returns a string label for it
     def predict(self, feature_array):
         # Defaults to returning silence
         return kEventToLabel[kSilence]
+
 
 
 # Use handtuned constants to classify beatbox events
@@ -170,21 +181,23 @@ class ManualClassifier(BeatboxClassifier) :
     def __init__(self):
         super(ManualClassifier, self).__init__()
 
-        # TODO: set up parameters
+        # TODO: set up parameters?
+        raise Exception("Not implemented")
+
+
+
+# Uses Gradient Boosted Regression Trees to classify beatbox events
+class GBRTClassifier(BeatboxClassifier) :
+    def __init__(self):
+        super(GBRTClassifier, self).__init__()
+
+        self.clf = GradientBoostingClassifier()
 
     # Fit our classifier to labels
     def fit(self, feature_arrays, labels):
-        # Log features and labels so we can load them in analysis scripts
-        with open("features.pkl", "wb") as fid:
-            cPickle.dump(feature_arrays, fid)
-        with open("labels.pkl", "wb") as fid:
-            cPickle.dump(labels, fid)
+        features_scaled = scale(feature_arrays)
+        self.clf.fit(features_scaled, labels)
 
-        # Defaults to nothing
-        return
-
-    # Override so that prediction is, ya know, actually done
+    # Takes a feature vector and returns a string label for it
     def predict(self, feature_array):
-        #TODO: actually classify features
-        label = super(ManualClassifier, self).predict(feature_array)
-        return label
+        return self.clf.predict([feature_array])[0]

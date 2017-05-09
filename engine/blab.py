@@ -183,7 +183,7 @@ class MainWidget(BaseWidget) :
                     self.player.on_event(kNoEvent)
             else:
                 start_t = time.time()
-                label = self.mic_handler.add_data(data)
+                label = self.mic_handler.add_data(data, self.current_label)
                 event = kLabelToEvent[label]
                 if event is not kNoEvent:
                     print label
