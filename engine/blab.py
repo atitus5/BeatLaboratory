@@ -156,12 +156,13 @@ class MainWidget(BaseWidget) :
 
 
     def on_key_down(self, keycode, modifiers):
-        # play / pause toggle
-        if keycode[1] == 'p':
-            self.clock.toggle()
-            self.bg.play_toggle()
-            if kRecord:
-                self.writer.toggle()
+        if not self.training:
+            # play / pause toggle
+            if keycode[1] == 'p':
+                self.clock.toggle()
+                self.bg.play_toggle()
+                if kRecord:
+                    self.writer.toggle()
 
         if not kUseMic:
             # button down
@@ -200,6 +201,7 @@ class MainWidget(BaseWidget) :
             self.multiplier_streak_label.text = ''
 
         self.music_audio.on_update()
+
         if kUseMic and self.player is not None:
             if self.training:
                 if self.player.next_gem >= len(self.player.gem_data):
@@ -230,6 +232,8 @@ class MainWidget(BaseWidget) :
                         # We're ready to gooooo
                         self.mic_handler.processing_audio = True
                         self.current_label = self.player.gem_data[self.player.next_gem][1]
+                        frame_start = int((self.player.now - self.player.gem_data[self.player.next_gem][0] + kSlopWindow) * kSampleRate)
+                        self.mic_handler.buf_idx = frame_start
 
                 self.mic_audio.on_update()
 

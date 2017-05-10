@@ -101,12 +101,14 @@ class FeatureManager(object):
         # Take real-optimized FFT of audio signal
         spectrum = np.fft.rfft(audio_data, n=kFFTBins)
         '''
+        scaling = len(audio_data) / float(np.count_nonzero(audio_data))
 
         # Log frame energy of DC-filtered (NOT pre-emphasis) signal
         dc_comp = np.mean(audio_data)
         dc_filtered = audio_data - dc_comp
         fe = sum([dc_filtered[i] ** 2 for i in xrange(len(dc_filtered))])
         lfe = max(-50.0, np.log(fe))
+        scaled_lfe = lfe * scaling
 
         '''
         abs_spectrum = np.asarray(map(abs, spectrum)).T
@@ -126,6 +128,7 @@ class FeatureManager(object):
 
         # From Eran's input demo
         zero_crossings = np.count_nonzero(audio_data[1:] * audio_data[:-1] < 0)
+        scaled_zc = zero_crossings * scaling
 
         '''
         # Compute normalized energies in subsets of Mel bands
@@ -177,7 +180,7 @@ class FeatureManager(object):
                                     zc=zero_crossings)
         feature_vec = feature_vec.asarray()
         '''
-        feature_vec = np.array([decay, lfe, zero_crossings])
+        feature_vec = np.array([decay, scaled_lfe, scaled_zc])
         
         return feature_vec
 
