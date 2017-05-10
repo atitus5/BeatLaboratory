@@ -96,7 +96,7 @@ class FeatureManager(object):
         self.dct = np.cos(np.dot(i_vec.reshape((i_vec.size, 1)), j_vec.reshape((1, j_vec.size))))
         '''
 
-    def compute_features(self, audio_data, rectified_audio_data):
+    def compute_features(self, audio_data):
         '''
         # Take real-optimized FFT of audio signal
         spectrum = np.fft.rfft(audio_data, n=kFFTBins)
@@ -165,7 +165,6 @@ class FeatureManager(object):
 
         # Compute pitch as spectral peak (ignoring DC and low-freq info)
         pitch_idx = np.argmax(abs_spectrum[2:])
-        '''
 
         # Compute ratio of peak to average of rectified signal after peak (for decay)
         rectified_peak_idx = np.argmax(rectified_audio_data)
@@ -174,6 +173,7 @@ class FeatureManager(object):
         decay_avg = np.mean(rectified_audio_data[rectified_peak_idx + 1:])
         attack = rectified_peak / attack_avg
         decay = rectified_peak / decay_avg
+        '''
 
         # Compose feature vector
         '''
@@ -182,7 +182,8 @@ class FeatureManager(object):
                                     zc=zero_crossings)
         feature_vec = feature_vec.asarray()
         '''
-        feature_vec = np.array([attack, decay, scaled_lfe, scaled_zc])
+        # feature_vec = np.array([attack, decay, scaled_lfe, scaled_zc])
+        feature_vec = np.array([scaled_lfe, scaled_zc])
         
         return feature_vec
 

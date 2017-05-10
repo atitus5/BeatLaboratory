@@ -32,10 +32,8 @@ correct = 0
 for i in xrange(total_events):
     label = labels[i]
 
-    attack = features[i, 0]
-    decay = features[i, 1]
-    lfe = features[i, 2]
-    zc = features[i, 3]
+    lfe = features[i, 0]
+    zc = features[i, 1]
 
     classification = kSilence
     if lfe >= kSilenceLFE:

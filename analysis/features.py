@@ -33,7 +33,7 @@ snare_features = []
 silence_features = []
 total_events = labels.shape[0]
 
-kFeatureStart = 0
+kFeatureStart = 1
 kFeatureEnd = kFeatureStart + 1
 # kFeatureEnd = normalized_features.shape[1]
 # kFeatureEnd = features.shape[1]

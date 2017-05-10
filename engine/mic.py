@@ -29,7 +29,6 @@ class MicrophoneHandler(object) :
         self.buf_size = 2 * self.slop_frames
         print "Buf size is %d frames (%.3f seconds)" % (self.buf_size, self.buf_size / float(kSampleRate))
         self.buf = np.zeros(self.buf_size, dtype=np.float32)
-        self.rect_buf = np.zeros(self.buf_size, dtype=np.float32)   # Rectified audio
         self.buf_idx = 0
 
         self.processing_audio = False
@@ -51,11 +50,10 @@ class MicrophoneHandler(object) :
         if buffer_full:
             # Fill as much as we can, then reset index
             self.buf[self.buf_idx:] = data[:self.buf_size - self.buf_idx]
-            self.rect_buf[self.buf_idx:] = abs(data[:self.buf_size - self.buf_idx])
             self.buf_idx = 0
 
             # Convert the buffer to features
-            feature_vector = self.feature_manager.compute_features(self.buf, self.rect_buf)
+            feature_vector = self.feature_manager.compute_features(self.buf)
             self.training_data.append([feature_vector, label])
 
             # Clear buffer out
@@ -68,7 +66,6 @@ class MicrophoneHandler(object) :
         else:
             # Fill 'er up!
             self.buf[self.buf_idx:self.buf_idx + len(data)] = data
-            self.rect_buf[self.buf_idx:self.buf_idx + len(data)] = abs(data)
             self.buf_idx += len(data)
 
     def train_classifier(self):
@@ -103,11 +100,10 @@ class MicrophoneHandler(object) :
         if buffer_full:
             # Fill as much as we can, then reset index
             self.buf[self.buf_idx:] = data[:self.buf_size - self.buf_idx]
-            self.rect_buf[self.buf_idx:] = abs(data[:self.buf_size - self.buf_idx])
             self.buf_idx = 0
 
             # Get features (in the format our classifier expects)
-            feature_vec = self.feature_manager.compute_features(self.buf, self.rect_buf)
+            feature_vec = self.feature_manager.compute_features(self.buf)
 
             # Update our model as we go, if the classifier supports it
             if self.classifier.supports_partial_fit():
@@ -126,7 +122,6 @@ class MicrophoneHandler(object) :
         else:
             # Fill 'er up!
             self.buf[self.buf_idx:self.buf_idx + len(data)] = data
-            self.rect_buf[self.buf_idx:self.buf_idx + len(data)] = abs(data)
             self.buf_idx += len(data)
 
         return event
