@@ -45,9 +45,6 @@ snapGems = True # snap gems to fraction of a barline.
 song_path = '../data/24KMagicNoDrums' # could make command argument in future
 train_song_path = '../data/training' # could make command argument in future
 
-# Save classifier model as Pickle binary
-model_path = "../data/classifier_model.pkl"
-
 
 # MAIN WIDGET
 class MainWidget(BaseWidget) :

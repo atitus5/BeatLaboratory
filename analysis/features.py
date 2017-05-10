@@ -21,8 +21,10 @@ with open(features_filename, "rb") as fid:
 with open(labels_filename, "rb") as fid:
     labels = cPickle.load(fid)
 
+'''
 # Normalize rows
 normalized_features = normalize(features, axis=0, norm="l1")
+'''
 
 # Order spectrogram by classification type
 kick_features = []
@@ -32,40 +34,37 @@ silence_features = []
 total_events = labels.shape[0]
 
 kFeatureStart = 0
+kFeatureEnd = kFeatureStart + 1
 # kFeatureEnd = normalized_features.shape[1]
-kFeatureEnd = (kFFTBins / 2) + 1
+# kFeatureEnd = features.shape[1]
 
 for i in xrange(total_events):
     label = labels[i]
     if label == kKick:
-        kick_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+        kick_features.append(features[i, kFeatureStart:kFeatureEnd])
     elif label == kSnare:
-        snare_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+        snare_features.append(features[i, kFeatureStart:kFeatureEnd])
     '''
     elif label == kHihat:
-        hihat_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+        hihat_features.append(features[i, kFeatureStart:kFeatureEnd])
     elif label == kSilence:
-        silence_features.append(normalized_features[i, kFeatureStart:kFeatureEnd])
+        silence_features.append(features[i, kFeatureStart:kFeatureEnd])
     '''
+
 kick_features = np.asarray(kick_features)
-hihat_features = np.asarray(hihat_features)
+# hihat_features = np.asarray(hihat_features)
 snare_features = np.asarray(snare_features)
-silence_features = np.asarray(silence_features)
+# silence_features = np.asarray(silence_features)
 padding = np.zeros((1, kFeatureEnd - kFeatureStart))
 
-
-high_freq_start = 76
-print "Average high freq spectral sum for kick: %.6f" % np.mean([sum(kick_features[i, high_freq_start:] for i in xrange(kick_features.shape[0]))])
-print "Average high freq spectral sum for snare: %.6f" % np.mean([sum(snare_features[i, high_freq_start:] for i in xrange(snare_features.shape[0]))])
-
-'''
-ordered_features = np.concatenate((kick_features, padding,
-                                   hihat_features, padding,
-                                   snare_features, padding,
-                                   silence_features))
-'''
 ordered_features = np.concatenate((kick_features, padding,
                                    snare_features))
+'''
+hihat_features, padding,
+snare_features, padding
+silence_features))
+'''
+print ordered_features
 
 y_labels = ["" for i in xrange(total_events)]
 y_labels[0] = "Kick"

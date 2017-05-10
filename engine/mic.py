@@ -41,8 +41,7 @@ class MicrophoneHandler(object) :
 
         # Store data for training the classifier
         self.training_data = []     # 2D array of (features, label) rows
-        # self.classifier = ManualClassifier()     # For now, use classifier with handtuned parameters
-        self.classifier = GBRTClassifier()
+        self.classifier = ManualClassifier()
 
     # Receive data and send back a feature vector for the current window, if buffer fills
     def add_training_data(self, data, label):

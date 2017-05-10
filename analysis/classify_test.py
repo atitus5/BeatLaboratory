@@ -21,14 +21,10 @@ with open(features_filename, "rb") as fid:
 with open(labels_filename, "rb") as fid:
     labels = cPickle.load(fid)
 
+'''
 # Normalize rows
 normalized_features = np.asarray(normalize(features, axis=0, norm="l1"))
-
-# Hand tuned constants
-kSilenceLFE = 0.0
-kHihatZC = 0.0375
-kHighFreqStartIdx = kFFTBins / 4
-kSnareHighFreq = 0.114
+'''
 
 # See how good our classification is!
 total_events = labels.shape[0]
@@ -36,30 +32,33 @@ correct = 0
 for i in xrange(total_events):
     label = labels[i]
 
-    high_freq_sum = sum(normalized_features[i, kHighFreqStartIdx:(kFFTBins / 2) + 1])
-    lfe = normalized_features[i, (kFFTBins / 2) + 1]
-    zc = normalized_features[i, (kFFTBins / 2) + 2]
+    decay = features[i, 0]
+    lfe = features[i, 1]
+    zc = features[i, 2]
 
-    classification = 254
+    classification = kSilence
     if lfe >= kSilenceLFE:
         # It's NOT silence!
         if zc >= kHihatZC:
-            classification = 1
-        elif high_freq_sum >= kSnareHighFreq:
-            classification = 2
+            # It's a hi-hat!
+            classification = kHihat
+        elif decay >= kDecay:
+            # It's a kick!
+            classification = kKick
         else:
-            classification = 0
+            # It must be a snare then
+            classification = kSnare
 
     if classification == label:
-        # print "Correctly classified %d" % label
+        print "Correctly classified %d" % label
         correct += 1
     else:
-        # print "Misclassified %d as %d" % (label, classification)
+        print "Misclassified %d as %d" % (label, classification)
         pass
 
 print "Manual thresholds accuracy: %.3f" % (correct / float(total_events))
 
-
+'''
 # Whiten the data
 features_scaled = scale(features)
 
@@ -122,5 +121,6 @@ for i in xrange(total_events):
     if classification == label:
         correct += 1
 print "GBRT accuracy: %.3f" % (correct / float(total_events))
+'''
 
 

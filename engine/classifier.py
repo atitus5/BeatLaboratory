@@ -12,6 +12,8 @@ from scipy.signal import lfilter
 from scipy.stats import kurtosis
 from sklearn.preprocessing import normalize, scale
 from sklearn.ensemble import *
+from sklearn.neural_network import *
+from sklearn.naive_bayes import *
 import time
 
 import sys
@@ -19,7 +21,6 @@ sys.path.append('..')
 
 from common.audio import *
 
-kChunkSize = int(kSampleRate * .050)    # 50 ms
 kNumMFCCs = 32
 kFFTBins = 512
 kEnergyBands = 23
@@ -94,26 +95,20 @@ class FeatureManager(object):
         self.dct = np.cos(np.dot(i_vec.reshape((i_vec.size, 1)), j_vec.reshape((1, j_vec.size))))
 
     def compute_features(self, audio_data):
-        # Pre-emphasize signal (we need to recognize those snare/hi-hat fricatives!!)
-        emphasized_audio = lfilter(self.s_of, self.s_pe, audio_data)
-
-        # Take real-optimized FFT of emphasized audio signal
-        spectrum = np.fft.rfft(emphasized_audio, n=kFFTBins)
+        # Take real-optimized FFT of audio signal
+        spectrum = np.fft.rfft(audio_data, n=kFFTBins)
 
         # Log frame energy of DC-filtered (NOT pre-emphasis) signal
-        dc_filtered = audio_data - np.mean(audio_data)
+        dc_comp = np.mean(audio_data)
+        dc_filtered = audio_data - dc_comp
         fe = sum([dc_filtered[i] ** 2 for i in xrange(len(dc_filtered))])
         lfe = max(-50.0, np.log(fe))
 
-        # Compute Mel-frequency Spectral Coefficients (MFSCs)
         abs_spectrum = np.asarray(map(abs, spectrum)).T
+
+        '''
+        # Compute Mel-frequency Spectral Coefficients (MFSCs)
         mel_energies = np.dot(kMelFilterBank, abs_spectrum)
-        '''
-        if np.count_nonzero(mel_energies) < len(mel_energies):
-            # We're going to divide by zero... add a tiny epsilon to the energies
-            eps = 1e-9
-            mel_energies = np.add(np.multiply(eps, np.ones(len(mel_energies))), mel_energies)
-        '''
             
         mfsc = np.maximum(np.multiply(-50.0, np.ones(kMelFilterBank.shape[0])),
                           np.log(mel_energies))
@@ -123,10 +118,12 @@ class FeatureManager(object):
         #         = C * msfc
         mfcc = np.dot(self.dct, mfsc.reshape((mfsc.shape[0], 1)))
         mfcc = mfcc.reshape((mfcc.size))
+        '''
 
         # From Eran's input demo
-        zero_crossings = np.count_nonzero(emphasized_audio[1:] * emphasized_audio[:-1] < 0)
+        zero_crossings = np.count_nonzero(audio_data[1:] * audio_data[:-1] < 0)
 
+        '''
         # Compute normalized energies in subsets of Mel bands
         energies = []
         band_size = len(mel_energies) / float(kEnergyBands)
@@ -140,11 +137,40 @@ class FeatureManager(object):
         # normalize spectrum
         normalized_spectrum = normalize(abs_spectrum.reshape(1, -1), axis=1, norm="l1")
 
+        # Compute rolloff and brightness
+        rolloff_pct = 0.85
+        rolloff_idx = 0         # Index in spectrum below which 85% of frame energy is
+        brightness_idx = 34     # Approx. 1500 Hz
+        brightness_energy = 0.0 # Energy above frequency corresponding to brightness_idx
+
+        total_spectral_energy = sum([abs_spectrum[i] ** 2 for i in xrange(len(abs_spectrum))])
+        energy_so_far = 0.0
+        for i in xrange(len(abs_spectrum)):
+            current_energy = abs_spectrum[i] ** 2
+            energy_so_far += current_energy
+            if energy_so_far <= (rolloff_pct * total_spectral_energy):
+                rolloff_idx += 1
+            if i >= brightness_idx:
+                brightness_energy += current_energy
+
+        # Percentage of energy above frequency corresponding to brightness_idx
+        brightness = brightness_energy / total_spectral_energy
+
+        # Compute pitch as spectral peak (ignoring DC and low-freq info)
+        pitch_idx = np.argmax(abs_spectrum[2:])
+        '''
+
+        # Compute ratio of peak to average of rectified signal in order to get an idea of decay
+        rectified_audio = abs(audio_data)
+        rectified_peak = max(rectified_audio)
+        rectified_avg = np.mean(rectified_audio)
+        decay = rectified_peak / rectified_avg
+
         # Compose feature vector
-        feature_vec = FeatureVector(normalized_spectrum=np.reshape(normalized_spectrum, (normalized_spectrum.shape[1])),
+        feature_vec = FeatureVector(decay=decay,
                                     lfe=lfe,
                                     zc=zero_crossings)
-
+        
         return feature_vec
 
 
@@ -176,14 +202,55 @@ class BeatboxClassifier(object):
 
 
 
+kDecay = 16.0
+kSilenceLFE = 0.0
+kHihatZC = 2100
+
 # Use handtuned constants to classify beatbox events
 class ManualClassifier(BeatboxClassifier) :
     def __init__(self):
         super(ManualClassifier, self).__init__()
 
-        # TODO: set up parameters?
-        raise Exception("Not implemented")
+        # Hand-tuned to start
+        self.cutoff_idx = kFFTBins / 4
 
+        # Uninitialized to start
+        self.decay = kDecay
+        self.silence_lfe = kSilenceLFE
+        self.hihat_zc = kHihatZC
+
+    # Fit our classifier to labels
+    def fit(self, feature_arrays, labels):
+        # Nothing to be done now - leave as pre-trained constants
+        pass
+        '''
+        # Log features and labels so we can load them in analysis scripts
+        with open("features.pkl", "wb") as fid:
+            cPickle.dump(feature_arrays, fid)
+        with open("labels.pkl", "wb") as fid:
+            cPickle.dump(labels, fid)
+        '''
+
+    # Takes a feature vector and returns a string label for it
+    def predict(self, feature_array):
+        decay = feature_array[0]
+        lfe = feature_array[1]
+        zc = feature_array[2]
+
+        classification = kSilence
+        if lfe >= self.silence_lfe:
+            # It's NOT silence!
+            if zc >= self.hihat_zc:
+                # It's a hi-hat!
+                classification = kHihat
+            elif decay >= self.decay:
+                # It's a kick!
+                classification = kKick
+            else:
+                # It must be a snare then
+                classification = kSnare
+
+        return classification
 
 
 # Uses Gradient Boosted Regression Trees to classify beatbox events
@@ -197,6 +264,93 @@ class GBRTClassifier(BeatboxClassifier) :
     def fit(self, feature_arrays, labels):
         features_scaled = scale(feature_arrays)
         self.clf.fit(features_scaled, labels)
+        print "Trained GBRT with score %.3f" % self.clf.score(features_scaled, labels)
+
+    # Takes a feature vector and returns a string label for it
+    def predict(self, feature_array):
+        return self.clf.predict([feature_array])[0]
+
+
+
+# Uses Extra Trees Classifier to classify beatbox events
+class ETClassifier(BeatboxClassifier) :
+    def __init__(self):
+        super(ETClassifier, self).__init__()
+
+        self.clf = ExtraTreesClassifier()
+
+    # Fit our classifier to labels
+    def fit(self, feature_arrays, labels):
+        features_scaled = scale(feature_arrays)
+        self.clf.fit(features_scaled, labels)
+        print "Trained ET with score %.3f" % self.clf.score(features_scaled, labels)
+
+    # Takes a feature vector and returns a string label for it
+    def predict(self, feature_array):
+        return self.clf.predict([feature_array])[0]
+
+
+
+# Uses Multilayer Perceptions (MLPs)/Feedforward Neural Networks to classify beatbox events
+class NNClassifier(BeatboxClassifier) :
+    def __init__(self):
+        super(NNClassifier, self).__init__()
+
+        hidden_layer_sizes = (128, 128, 32, 128)
+        self.clf = MLPClassifier(hidden_layer_sizes=hidden_layer_sizes)
+
+    # Fit our classifier to labels
+    def fit(self, feature_arrays, labels):
+        features_scaled = scale(feature_arrays)
+        self.clf.fit(features_scaled, labels)
+        print "Trained NN with score %.3f" % self.clf.score(features_scaled, labels)
+
+    def supports_partial_fit(self):
+        # Nah
+        return False
+        '''
+        # We do! Look at dat
+        return True
+        '''
+
+    '''
+    def partial_fit(self, feature_arrays, label):
+        features_scaled = scale(feature_arrays)
+        classes = (kKick, kHihat, kSnare, kSilence)
+        self.clf.partial_fit([features_scaled], [label], classes)
+    '''
+
+    # Takes a feature vector and returns a string label for it
+    def predict(self, feature_array):
+        return self.clf.predict([feature_array])[0]
+
+# Uses Gaussian Naive Bayesian classification to classify beatbox events
+class GNBClassifier(BeatboxClassifier) :
+    def __init__(self):
+        super(GNBClassifier, self).__init__()
+
+        self.clf = GaussianNB()
+
+    # Fit our classifier to labels
+    def fit(self, feature_arrays, labels):
+        features_scaled = scale(feature_arrays)
+        self.clf.fit(features_scaled, labels)
+        print "Trained GNB with score %.3f" % self.clf.score(features_scaled, labels)
+
+    def supports_partial_fit(self):
+        # Nah
+        return False
+        '''
+        # We do! Look at dat
+        return True
+        '''
+
+    '''
+    def partial_fit(self, feature_arrays, label):
+        features_scaled = scale(feature_arrays)
+        classes = (kKick, kHihat, kSnare, kSilence)
+        self.clf.partial_fit([features_scaled], [label], classes)
+    '''
 
     # Takes a feature vector and returns a string label for it
     def predict(self, feature_array):
