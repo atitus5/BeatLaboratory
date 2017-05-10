@@ -95,6 +95,7 @@ class ParticleSystem(Widget):
         self.emission_time = 0.0
         self.frame_time = 0.0
         self.num_particles = 0
+        self.active = False
 
         if config is not None:
             self._parse_config(config)
@@ -113,13 +114,21 @@ class ParticleSystem(Widget):
     def start(self, duration=sys.maxint):
         if self.emission_rate != 0:
             self.emission_time = duration
+            self.active = True
 
     def stop(self, clear=False):
         self.emission_time = 0.0
+        self.active = False
         if clear:
             self.num_particles = 0
             self.particles_dict = dict()
             self.canvas.clear()
+
+    def toggle(self):
+        if self.active:
+            self.stop()
+        else:
+            self.start()
 
     def on_max_num_particles(self, instance, value):
         self.max_capacity = value

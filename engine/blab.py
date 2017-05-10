@@ -296,6 +296,7 @@ class Player(object):
         self.now = seek
         self.score = 0
         self.streak = 0
+        self.display.update_ps(self.get_multiplier())
 
         # skip ahead in case of seeks
         while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
@@ -311,7 +312,7 @@ class Player(object):
                         self.display.gem_hit(i)
                         self.next_gem += 1
                         self.streak += 1
-                        self.score += 1 * min(4, 1 + self.streak/5)
+                        self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
                         return
                 else:
                     break
@@ -333,7 +334,7 @@ class Player(object):
             if self.gem_data[self.next_gem][1] == lane:
                 self.display.gem_hit(self.next_gem)
                 self.streak += 1
-                self.score += 1 * min(4, 1 + self.streak/5)
+                self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
             else:
                 self.display.gem_miss(self.next_gem)
                 self.streak = 0
@@ -353,6 +354,7 @@ class Player(object):
                 self.streak = 0
 
         self.display.on_update(dt)
+        self.display.update_ps(self.get_multiplier())
 
     def get_score(self):
         return self.score
@@ -361,7 +363,7 @@ class Player(object):
         return self.streak
 
     def get_multiplier(self):
-        return min(4, 1 + self.streak/5)
+        return min(kMaxMultiplier, 1 + self.streak/5)
 
 
 # HELPER FUNCTIONS

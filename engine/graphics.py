@@ -85,6 +85,12 @@ kBeatlineColor = (1,1,1,.5)
 kTitleFontSize = 0.9 * kTopY
 kTopFontSize = 0.6 * kTopY
 
+kMaxMultiplier = 4
+kFireColors = [(255 / 256.0, 51 / 256.0, 0 / 256.0, 1.0),
+               (230 / 256.0, 102 / 256.0, 0 / 256.0, 1.0),
+               (0 / 256.0, 102 / 256.0, 255 / 256.0, 1.0),
+               (204 / 256.0, 224 / 256.0, 255 / 256.0, 1.0)]
+
 from common.gfxutil import *
 
 
@@ -548,6 +554,14 @@ class HitParticleDisplay(InstructionGroup):
         widget.add_widget(self.br)
         self.installed = True
 
+    def update_ps(self, multiplier):
+        self.bl.toggle()
+        self.bl.start_color = kFireColors[multiplier - 1]
+        self.bl.toggle()
+        self.br.toggle()
+        self.br.start_color = kFireColors[multiplier - 1]
+        self.br.toggle()
+
     def on_update(self, dt):
         for i in range(len(self.m_hit_times)):
             if self.m_hit_times[i] >= 0:
@@ -693,6 +707,9 @@ class BeatMatchDisplay(InstructionGroup):
             return self.bars[self.current_bar-1], gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1])
         else:
             return self.bars[self.current_bar+1], gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar])
+
+    def update_ps(self, multiplier):
+        self.hpd.update_ps(multiplier)
 
     def install_particle_systems(self, widget):
         self.hpd.install_particle_systems(widget)
