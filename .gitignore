@@ -9,3 +9,8 @@
 *.so
 
 *.pkl
+
+# Images
+*.xcf
+*_line.png
+*_full.png
