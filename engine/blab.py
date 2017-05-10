@@ -93,7 +93,7 @@ class MainWidget(BaseWidget) :
         if kUseMic:
             # Set up microphone input handling and training
             slop_frames = int(kSlopWindow * kSampleRate)
-            self.mic_handler = MicrophoneHandler(1, slop_frames, self.mic_audio.buffer_size)
+            self.mic_handler = MicrophoneHandler(1, slop_frames)
 
             if not kDefaultModel:
                 # Need to train a classifier first

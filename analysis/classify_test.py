@@ -1,8 +1,6 @@
 import cPickle
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import normalize, scale
 import sys
 
 sys.path.append('..')
@@ -20,11 +18,6 @@ with open(features_filename, "rb") as fid:
     features = cPickle.load(fid)
 with open(labels_filename, "rb") as fid:
     labels = cPickle.load(fid)
-
-'''
-# Normalize rows
-normalized_features = np.asarray(normalize(features, axis=0, norm="l1"))
-'''
 
 # See how good our classification is!
 total_events = labels.shape[0]
@@ -47,18 +40,6 @@ for i in xrange(total_events):
         else:
             # It must be a hi-hat then
             classification = kHihat
-
-        '''
-        if zc >= kHihatZC:
-            # It's a hi-hat!
-            classification = kHihat
-        elif decay >= kDecay:
-            # It's a kick!
-            classification = kKick
-        else:
-            # It must be a snare then
-            classification = kSnare
-        '''
 
     if classification == label:
         print "Correctly classified %d" % label

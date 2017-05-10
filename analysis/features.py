@@ -1,8 +1,6 @@
 import cPickle
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import normalize
 import sys
 
 sys.path.append('..')

@@ -1,10 +1,6 @@
 #mic.py
 
-
-import math
-
 import numpy as np
-from scipy.signal import hamming
 import time
 
 import sys
@@ -18,16 +14,14 @@ from classifier import *
 # return events corresponding to beatbox events on each beat
 # NOTE: currently only accepts mono audio (i.e. num_channels = 1)
 class MicrophoneHandler(object) :
-    def __init__(self, num_channels, slop_frames, mic_buf_size):
+    def __init__(self, num_channels, slop_frames):
         super(MicrophoneHandler, self).__init__()
 
         assert(num_channels == 1)
 
         # Set up audio buffer
         self.slop_frames = slop_frames
-        self.mic_buf_size = mic_buf_size
         self.buf_size = 2 * self.slop_frames
-        print "Buf size is %d frames (%.3f seconds)" % (self.buf_size, self.buf_size / float(kSampleRate))
         self.buf = np.zeros(self.buf_size, dtype=np.float32)
         self.buf_idx = 0
 
@@ -57,9 +51,7 @@ class MicrophoneHandler(object) :
             self.training_data.append([feature_vector, label])
 
             # Clear buffer out
-            # NOTE: not strictly necessary, since it is overwritten later --- feel free
-            # to delete if performance issues arise
-            # self.buf[:] = 0
+            self.buf[:] = 0
 
             # Wait until we are told again to start processing audio
             self.processing_audio = False
@@ -113,9 +105,7 @@ class MicrophoneHandler(object) :
             event = self._classify_event(feature_vec)
 
             # Clear buffer out
-            # NOTE: not strictly necessary, since it is overwritten later --- feel free
-            # to delete if performance issues arise
-            # self.buf[:] = 0
+            self.buf[:] = 0
 
             # Wait until we are told again to start processing audio
             self.processing_audio = False
