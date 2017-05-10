@@ -49,7 +49,7 @@ kLabelToEvent = {
     "": kNoEvent
 }
 
-# Simple container class with defined features
+# Simple container class with arbitrary features
 class FeatureVector(object):
     def __init__(self, **kwargs):
         self.raw_features = {}
@@ -84,6 +84,7 @@ class FeatureManager(object):
     def __init__(self):
         super(FeatureManager, self).__init__()
 
+        '''
         # Set up pre-emphasis filter coefficients
         self.s_pe = 1.0      # Output; s_pe[n]
         self.s_of = [1.0, -0.97]     # Input;  s_of[n] - 0.97s_of[n - 1]
@@ -93,10 +94,13 @@ class FeatureManager(object):
         i_vec = np.asarray(np.multiply(np.pi, range(kNumMFCCs)) / float(kMelFilterBank.shape[0]))
         j_vec = np.asarray(map(lambda j: j + 0.5, range(kMelFilterBank.shape[0])))
         self.dct = np.cos(np.dot(i_vec.reshape((i_vec.size, 1)), j_vec.reshape((1, j_vec.size))))
+        '''
 
     def compute_features(self, audio_data):
+        '''
         # Take real-optimized FFT of audio signal
         spectrum = np.fft.rfft(audio_data, n=kFFTBins)
+        '''
 
         # Log frame energy of DC-filtered (NOT pre-emphasis) signal
         dc_comp = np.mean(audio_data)
@@ -104,9 +108,9 @@ class FeatureManager(object):
         fe = sum([dc_filtered[i] ** 2 for i in xrange(len(dc_filtered))])
         lfe = max(-50.0, np.log(fe))
 
+        '''
         abs_spectrum = np.asarray(map(abs, spectrum)).T
 
-        '''
         # Compute Mel-frequency Spectral Coefficients (MFSCs)
         mel_energies = np.dot(kMelFilterBank, abs_spectrum)
             
@@ -167,9 +171,13 @@ class FeatureManager(object):
         decay = rectified_peak / rectified_avg
 
         # Compose feature vector
+        '''
         feature_vec = FeatureVector(decay=decay,
                                     lfe=lfe,
                                     zc=zero_crossings)
+        feature_vec = feature_vec.asarray()
+        '''
+        feature_vec = np.array([decay, lfe, zero_crossings])
         
         return feature_vec
 

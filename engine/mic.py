@@ -33,9 +33,6 @@ class MicrophoneHandler(object) :
 
         self.processing_audio = False
 
-        # Set up and cache window for signal
-        self.window = hamming(self.buf_size)
-
         # Set up our feature manager for creating feature vectors from audio
         self.feature_manager = FeatureManager()
 
@@ -52,7 +49,7 @@ class MicrophoneHandler(object) :
         buffer_full = (self.buf_size - self.buf_idx) < len(data)
         if buffer_full:
             # Fill as much as we can, then reset index
-            self.buf[self.buf_idx:] = np.multiply(data[:self.buf_size - self.buf_idx], self.window[self.buf_idx:])
+            self.buf[self.buf_idx:] = data[:self.buf_size - self.buf_idx]
             self.buf_idx = 0
 
             # Convert the buffer to features
@@ -62,7 +59,7 @@ class MicrophoneHandler(object) :
             # Clear buffer out
             # NOTE: not strictly necessary, since it is overwritten later --- feel free
             # to delete if performance issues arise
-            self.buf[:] = 0
+            # self.buf[:] = 0
 
             # Wait until we are told again to start processing audio
             self.processing_audio = False
@@ -78,7 +75,7 @@ class MicrophoneHandler(object) :
         features = []
         labels = []
         for sample in xrange(len(self.training_data)):
-            features.append(self.training_data[sample][0].asarray())
+            features.append(self.training_data[sample][0])
             labels.append(self.training_data[sample][1])
         features = np.asarray(features)
         labels = np.asarray(labels)
@@ -102,11 +99,11 @@ class MicrophoneHandler(object) :
         buffer_full = (self.buf_size - self.buf_idx) < len(data)
         if buffer_full:
             # Fill as much as we can, then reset index
-            self.buf[self.buf_idx:] = np.multiply(data[:self.buf_size - self.buf_idx], self.window[self.buf_idx:])
+            self.buf[self.buf_idx:] = data[:self.buf_size - self.buf_idx]
             self.buf_idx = 0
 
             # Get features (in the format our classifier expects)
-            feature_vec = self.feature_manager.compute_features(self.buf).asarray()
+            feature_vec = self.feature_manager.compute_features(self.buf)
 
             # Update our model as we go, if the classifier supports it
             if self.classifier.supports_partial_fit():
@@ -118,7 +115,7 @@ class MicrophoneHandler(object) :
             # Clear buffer out
             # NOTE: not strictly necessary, since it is overwritten later --- feel free
             # to delete if performance issues arise
-            self.buf[:] = 0
+            # self.buf[:] = 0
 
             # Wait until we are told again to start processing audio
             self.processing_audio = False
@@ -129,7 +126,7 @@ class MicrophoneHandler(object) :
 
         return event
 
-    # Takes our full buffer of windowed data and classifies it as an appropriate beatbox sound
+    # Takes our full buffer of data and classifies it as an appropriate beatbox sound
     def _classify_event(self, feature_vec):
         # Classify it! (Woah, that's what this line of code does?!)
         classification = self.classifier.predict(feature_vec)

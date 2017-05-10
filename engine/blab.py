@@ -183,11 +183,12 @@ class MainWidget(BaseWidget) :
                 label = self.mic_handler.add_data(data, self.current_label)
                 event = kLabelToEvent[label]
                 if event is not kNoEvent:
-                    print label
+                    # print label
                     self.player.on_event(event)
 
     def on_update(self) :
-        dt = self.clock.get_time() - self.now
+        t = self.clock.get_time()
+        dt = t - self.now
         self.now += dt
 
         if self.player is not None:
@@ -224,7 +225,7 @@ class MainWidget(BaseWidget) :
                 if not process_audio:
                     gems_active = self.player.next_gem < len(self.player.gem_data)
                     time_gap = self.player.gem_data[self.player.next_gem][0] - self.player.now
-                    gem_in_window = abs(time_gap) < kSlopWindow
+                    gem_in_window = abs(time_gap) <= kSlopWindow
                     if gems_active and gem_in_window:
                         # We're ready to gooooo
                         self.mic_handler.processing_audio = True

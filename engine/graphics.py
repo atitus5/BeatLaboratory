@@ -525,22 +525,26 @@ class HitParticleDisplay(InstructionGroup):
         self.br.emit_angle = 3*np.pi*4**-1
         self.b_hit_time = -1
 
+        self.installed = False
+
 
     def puff(self, i):
-        if i < 0 or i > len(self.m_psystems):
-            print "warning: ps puff out of bounds"
-            return
-        self.m_psystems[i].start()
-        self.m_hit_times[i] = 0
-        self.bl.start()
-        self.br.start()
-        self.b_hit_time = 0
+        if self.installed:
+            if i < 0 or i > len(self.m_psystems):
+                print "warning: ps puff out of bounds"
+                return
+            self.m_psystems[i].start()
+            self.m_hit_times[i] = 0
+            self.bl.start()
+            self.br.start()
+            self.b_hit_time = 0
 
     def install_particle_systems(self, widget):
         for ps in self.m_psystems:
             widget.add_widget(ps)
         widget.add_widget(self.bl)
         widget.add_widget(self.br)
+        self.installed = True
 
     def on_update(self, dt):
         for i in range(len(self.m_hit_times)):
