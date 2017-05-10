@@ -32,13 +32,25 @@ correct = 0
 for i in xrange(total_events):
     label = labels[i]
 
-    decay = features[i, 0]
-    lfe = features[i, 1]
-    zc = features[i, 2]
+    attack = features[i, 0]
+    decay = features[i, 1]
+    lfe = features[i, 2]
+    zc = features[i, 3]
 
     classification = kSilence
     if lfe >= kSilenceLFE:
         # It's NOT silence!
+        if zc <= kKickZC:
+            # It's a kick!
+            classification = kKick
+        elif zc <= kHihatZC:
+            # It's a snare!
+            classification = kSnare
+        else:
+            # It must be a hi-hat then
+            classification = kHihat
+
+        '''
         if zc >= kHihatZC:
             # It's a hi-hat!
             classification = kHihat
@@ -48,6 +60,7 @@ for i in xrange(total_events):
         else:
             # It must be a snare then
             classification = kSnare
+        '''
 
     if classification == label:
         print "Correctly classified %d" % label

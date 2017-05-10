@@ -188,7 +188,14 @@ class MainWidget(BaseWidget) :
                     self.player.on_event(event)
 
     def on_update(self) :
-        t = self.clock.get_time()
+        if self.bg.paused:
+            # Run our own clock
+            t = self.clock.get_time()
+        else:
+            # Sync with the music
+            self.music_audio.on_update()
+            t = self.bg.frame / float(kSampleRate)
+            self.clock.set_time(t)
         dt = t - self.now
         self.now += dt
 
@@ -199,8 +206,6 @@ class MainWidget(BaseWidget) :
         else:
             self.score_label.text = ''
             self.multiplier_streak_label.text = ''
-
-        self.music_audio.on_update()
 
         if kUseMic and self.player is not None:
             if self.training:
@@ -226,14 +231,15 @@ class MainWidget(BaseWidget) :
                 # the slop windows of neighboring gems
                 if not process_audio:
                     gems_active = self.player.next_gem < len(self.player.gem_data)
-                    time_gap = self.player.gem_data[self.player.next_gem][0] - self.player.now
-                    gem_in_window = abs(time_gap) <= kSlopWindow
-                    if gems_active and gem_in_window:
-                        # We're ready to gooooo
-                        self.mic_handler.processing_audio = True
-                        self.current_label = self.player.gem_data[self.player.next_gem][1]
-                        frame_start = int((self.player.now - self.player.gem_data[self.player.next_gem][0] + kSlopWindow) * kSampleRate)
-                        self.mic_handler.buf_idx = frame_start
+                    if gems_active:
+                        time_gap = self.player.gem_data[self.player.next_gem][0] - self.player.now
+                        gem_in_window = abs(time_gap) <= kSlopWindow
+                        if gem_in_window:
+                            # We're ready to gooooo
+                            self.mic_handler.processing_audio = True
+                            self.current_label = self.player.gem_data[self.player.next_gem][1]
+                            frame_start = int((self.player.now - self.player.gem_data[self.player.next_gem][0] + kSlopWindow) * kSampleRate)
+                            self.mic_handler.buf_idx = frame_start
 
                 self.mic_audio.on_update()
 

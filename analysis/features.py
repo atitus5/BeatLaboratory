@@ -10,7 +10,7 @@ sys.path.append('..')
 from engine.classifier import *
 
 if len(sys.argv) != 3:
-    print "Usage: python spectrogram.py <features file (Pickle)> <labels file (Pickle)>"
+    print "Usage: python features.py <features file (Pickle)> <labels file (Pickle)>"
     sys.exit(1)
 
 # Read in features and labels so we can plot them
@@ -44,35 +44,36 @@ for i in xrange(total_events):
         kick_features.append(features[i, kFeatureStart:kFeatureEnd])
     elif label == kSnare:
         snare_features.append(features[i, kFeatureStart:kFeatureEnd])
-    '''
     elif label == kHihat:
         hihat_features.append(features[i, kFeatureStart:kFeatureEnd])
     elif label == kSilence:
         silence_features.append(features[i, kFeatureStart:kFeatureEnd])
-    '''
 
 kick_features = np.asarray(kick_features)
-# hihat_features = np.asarray(hihat_features)
+hihat_features = np.asarray(hihat_features)
 snare_features = np.asarray(snare_features)
-# silence_features = np.asarray(silence_features)
+silence_features = np.asarray(silence_features)
 padding = np.zeros((1, kFeatureEnd - kFeatureStart))
 
-ordered_features = np.concatenate((kick_features, padding,
-                                   snare_features))
+ordered_features = np.concatenate((snare_features, padding,
+                                   hihat_features))
 '''
-hihat_features, padding,
-snare_features, padding
-silence_features))
+ordered_features = np.concatenate((kick_features, padding,
+                                   snare_features, padding,
+                                   hihat_features, padding,
+                                   silence_features))
 '''
 print ordered_features
 
 y_labels = ["" for i in xrange(total_events)]
-y_labels[0] = "Kick"
-y_labels[kick_features.shape[0] + 1] = "Snare"
+
+y_labels[0] = "Snare"
+y_labels[snare_features.shape[0] + 1] = "Hihat"
 '''
+y_labels[0] = "Kick"
 y_labels[kick_features.shape[0] + 1] = "Hihat"
 y_labels[kick_features.shape[0] + 1 + hihat_features.shape[0] + 1] = "Snare"
-y_labels[kick_features.shape[0] + 1 + hihat_features.shape[0] + 1 + snare_features.shape[0] + 1] = "Silence"
+# y_labels[kick_features.shape[0] + 1 + hihat_features.shape[0] + 1 + snare_features.shape[0] + 1] = "Silence"
 '''
 
 plt.pcolor(ordered_features, cmap="gnuplot2")

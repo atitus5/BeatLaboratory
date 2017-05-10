@@ -96,7 +96,7 @@ class FeatureManager(object):
         self.dct = np.cos(np.dot(i_vec.reshape((i_vec.size, 1)), j_vec.reshape((1, j_vec.size))))
         '''
 
-    def compute_features(self, audio_data):
+    def compute_features(self, audio_data, rectified_audio_data):
         '''
         # Take real-optimized FFT of audio signal
         spectrum = np.fft.rfft(audio_data, n=kFFTBins)
@@ -128,7 +128,7 @@ class FeatureManager(object):
 
         # From Eran's input demo
         zero_crossings = np.count_nonzero(audio_data[1:] * audio_data[:-1] < 0)
-        scaled_zc = zero_crossings * scaling
+        scaled_zc = int(zero_crossings * scaling)
 
         '''
         # Compute normalized energies in subsets of Mel bands
@@ -167,11 +167,13 @@ class FeatureManager(object):
         pitch_idx = np.argmax(abs_spectrum[2:])
         '''
 
-        # Compute ratio of peak to average of rectified signal in order to get an idea of decay
-        rectified_audio = abs(audio_data)
-        rectified_peak = max(rectified_audio)
-        rectified_avg = np.mean(rectified_audio)
-        decay = rectified_peak / rectified_avg
+        # Compute ratio of peak to average of rectified signal after peak (for decay)
+        rectified_peak_idx = np.argmax(rectified_audio_data)
+        rectified_peak = rectified_audio_data[rectified_peak_idx]
+        attack_avg = np.mean(rectified_audio_data[:rectified_peak_idx])
+        decay_avg = np.mean(rectified_audio_data[rectified_peak_idx + 1:])
+        attack = rectified_peak / attack_avg
+        decay = rectified_peak / decay_avg
 
         # Compose feature vector
         '''
@@ -180,7 +182,7 @@ class FeatureManager(object):
                                     zc=zero_crossings)
         feature_vec = feature_vec.asarray()
         '''
-        feature_vec = np.array([decay, scaled_lfe, scaled_zc])
+        feature_vec = np.array([attack, decay, scaled_lfe, scaled_zc])
         
         return feature_vec
 
@@ -213,8 +215,10 @@ class BeatboxClassifier(object):
 
 
 
-kDecay = 16.0
+# kDecay = 16.0
+# kDecay = 12.5
 kSilenceLFE = 0.0
+kKickZC = 700
 kHihatZC = 2100
 
 # Use handtuned constants to classify beatbox events
@@ -223,43 +227,39 @@ class ManualClassifier(BeatboxClassifier) :
         super(ManualClassifier, self).__init__()
 
         # Hand-tuned to start
-        self.cutoff_idx = kFFTBins / 4
-
-        # Uninitialized to start
-        self.decay = kDecay
+        # self.decay = kDecay
         self.silence_lfe = kSilenceLFE
+        self.kick_zc = kKickZC
         self.hihat_zc = kHihatZC
 
     # Fit our classifier to labels
     def fit(self, feature_arrays, labels):
-        # Nothing to be done now - leave as pre-trained constants
-        pass
-        '''
+        # Recompute constants based on what we just heard
+        # TODO
+
         # Log features and labels so we can load them in analysis scripts
         with open("features.pkl", "wb") as fid:
             cPickle.dump(feature_arrays, fid)
         with open("labels.pkl", "wb") as fid:
             cPickle.dump(labels, fid)
-        '''
 
     # Takes a feature vector and returns a string label for it
     def predict(self, feature_array):
-        decay = feature_array[0]
-        lfe = feature_array[1]
-        zc = feature_array[2]
+        lfe = feature_array[0]
+        zc = feature_array[1]
 
         classification = kSilence
         if lfe >= self.silence_lfe:
             # It's NOT silence!
-            if zc >= self.hihat_zc:
-                # It's a hi-hat!
-                classification = kHihat
-            elif decay >= self.decay:
+            if zc <= self.kick_zc:
                 # It's a kick!
                 classification = kKick
+            elif zc <= self.hihat_zc:
+                # It's a snare!
+                classification = kSnare
             else:
                 # It must be a snare then
-                classification = kSnare
+                classification = kHihat
 
         return classification
 
