@@ -235,14 +235,55 @@ class ManualClassifier(BeatboxClassifier) :
 
     # Fit our classifier to labels
     def fit(self, feature_arrays, labels):
-        # Recompute constants based on what we just heard
-        # TODO
+        # Recompute constants based on what we just heard as training data
+        kick_features = []
+        hihat_features = []
+        snare_features = []
+        silence_features = []
+        total_events = labels.shape[0]
 
+        # Format our data
+        for i in xrange(total_events):
+            label = labels[i]
+            if label == kKick:
+                kick_features.append(feature_arrays[i, :])
+            elif label == kSnare:
+                snare_features.append(feature_arrays[i, :])
+            elif label == kHihat:
+                hihat_features.append(feature_arrays[i, :])
+            elif label == kSilence:
+                silence_features.append(feature_arrays[i, :])
+        kick_features = np.asarray(kick_features)
+        hihat_features = np.asarray(hihat_features)
+        snare_features = np.asarray(snare_features)
+        silence_features = np.asarray(silence_features)
+
+        # Determine a good LFE threshold for classifying out silence
+        silence_avg_lfe = np.mean(silence_features[:, 0])
+        nonsilence_avg_lfe = np.mean(np.concatenate((kick_features[:, 0], hihat_features[:, 0], snare_features[:, 0])))
+        self.silence_lfe = (silence_avg_lfe + nonsilence_avg_lfe) / 2.0
+
+        # Determine a good zero-crossing threshold for classifying between kick and non-kick
+        kick_avg_zc = np.mean(kick_features[:, 1])
+        snare_avg_zc = np.mean(snare_features[:, 1])
+        hihat_avg_zc = np.mean(hihat_features[:, 1])
+        nonkick_avg_zc = min(snare_avg_zc, hihat_avg_zc)
+        self.kick_zc = int((kick_avg_zc + nonkick_avg_zc) / 2.0)
+
+        # Determine a good zero-crossing threshold for classifying between snare and hi-hat
+        self.hihat_zc = int((snare_avg_zc + hihat_avg_zc) / 2.0)
+
+        print "Using silence LFE threshold %.3f, kick ZC threshold %d, hihat ZC threshold %d" % (self.silence_lfe,
+                                                                                                 self.kick_zc,
+                                                                                                 self.hihat_zc)
+
+        '''
         # Log features and labels so we can load them in analysis scripts
         with open("features.pkl", "wb") as fid:
             cPickle.dump(feature_arrays, fid)
         with open("labels.pkl", "wb") as fid:
             cPickle.dump(labels, fid)
+        '''
 
     # Takes a feature vector and returns a string label for it
     def predict(self, feature_array):
