@@ -19,3 +19,5 @@ Acknowledgements:
 "Automatic classification of drum sounds: a comparison of feature selection methods and classification techniques"
 *Herrera et. al.*
 [link to paper](http://www.music.mcgill.ca/~ich/classes/mumt614/similarity/herrera02automatic.pdf)
+
+Particle system icons made by [Freepik]("http://www.freepik.com") from [Flaticon]("http://www.flaticon.com") is licensed by [Creative Commons BY 3.0]("http://creativecommons.org/licenses/by/3.0/")
