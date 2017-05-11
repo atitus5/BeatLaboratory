@@ -8,7 +8,8 @@ kBottomY = 40 # bottom padding
 kTopY = 60 # top padding
 
 # graphics only
-kGemWidth = 150
+# kGemWidth = 150
+kGemWidth = 75
 kGemHeight = kGemWidth
 kBoxThickness = 5
 kMeasureSpacing = 20 # vertical space between measures
