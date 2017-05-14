@@ -31,7 +31,8 @@ kSongs = (
     'artist' : 'Michael Jackson',
     'path' : '../data/BeatItNoDrums'}
     )
-train_song_path = '../data/training' # could make command argument in future
+
+train_song_path = '../data/training'
 
 kPopupTitle1 = "Welcome to BeatLaboratory!"
 kPopupMessage1 = '''Welcome to BeatLaboratory! Because everyone has
