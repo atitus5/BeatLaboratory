@@ -62,7 +62,7 @@ class GameWidget(Widget):
             self.bmd.install_particle_systems(self)
 
         # gameplay
-        self.player = Player(self.song_data.gems, self.bmd, seek)
+        self.player = Player(self.song_data, self.bmd, seek)
 
         # timekeeping
         self.clock = Clock()
@@ -93,7 +93,7 @@ class GameWidget(Widget):
                     self.player.on_event(event)
 
     def get_score(self):
-    	return self.player.get_score()
+        return self.player.get_score()
 
     def on_update(self) :
         if self.bg.paused:
@@ -108,6 +108,8 @@ class GameWidget(Widget):
         self.now += dt
 
         self.player.on_update(dt)
+        if self.train:
+            self.player.streak = 0
         if not self.train:
             self.score_label.text = 'score: ' + str(self.player.get_score())
             self.multiplier_streak_label.text = 'x' + str(self.player.get_multiplier()) + ' (' + str(self.player.get_streak()) + ' in a row)'
@@ -122,7 +124,7 @@ class GameWidget(Widget):
             process_audio = self.mic_handler.processing_audio
 
             # Only start processing audio if we have a gem within its slop window
-            # NOTE: this assumes our slop window is small enough to not spill into
+            # this assumes our slop window is small enough to not spill into
             # the slop windows of neighboring gems
             if not process_audio:
                 gems_active = self.player.next_gem < len(self.player.gem_data)
@@ -187,42 +189,24 @@ class SongData(object):
 # Handles game logic and keeps score.
 # Controls the display and the audio
 class Player(object):
-    def __init__(self, gem_data, display, seek):
+    def __init__(self, song_data, display, seek):
         super(Player, self).__init__()
-        self.gem_data = gem_data
+        self.gem_data = song_data.gems
+        self.bar_data = song_data.barlines
         self.display = display
         self.next_gem = 0
+        self.next_bar = 0
         self.now = seek
         self.score = 0
         self.streak = 0
         self.display.update_ps(self.get_multiplier())
+        self.bonus = False
 
         # skip ahead in case of seeks
-        while self.next_gem < len(self.gem_data) and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
+        while self.next_gem < len(self.gem_data)-1 and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
             self.next_gem += 1
-
-    # called by MainWidget
-    def on_button_down(self, lane):
-        if self.next_gem < len(self.gem_data):
-            # check for hit
-            for i in range(self.next_gem, len(self.gem_data)):
-                if abs(self.gem_data[i][0] - self.now) < kSlopWindow:
-                    if self.gem_data[i][1] == lane:
-                        self.display.gem_hit(i)
-                        self.next_gem += 1
-                        self.streak += 1
-                        self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
-                        return
-                else:
-                    break
-
-            # check for lane (wrong beat) miss
-            if abs(self.gem_data[self.next_gem][0] - self.now) < kSlopWindow:
-                self.display.gem_miss(self.next_gem)
-                self.next_gem += 1
-
-        # on miss
-        self.streak = 0
+        while self.next_bar < len(self.bar_data)-1 and self.bar_data[self.next_bar] <= self.gem_data[self.next_gem][0]:
+            self.next_bar += 1
 
     # called by MainWidget
     def on_event(self, lane):
@@ -235,13 +219,28 @@ class Player(object):
             else:
                 self.display.gem_miss(self.next_gem)
                 self.streak = 0
+            if self.next_gem < len(self.gem_data)-1:
+                self.next_gem += 1
+
+    def __use_bonus(self):
+        self.next_bar = min(len(self.bar_data)-1, self.next_bar+1)
+        while self.next_gem < len(self.gem_data)-1 and self.gem_data[self.next_gem][0] < self.bar_data[self.next_bar]:
+            self.display.gem_hit(self.next_gem)
+            self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
             self.next_gem += 1
+        self.bonus = False
 
     # needed to check if for pass gems (ie, went past the slop window)
     def on_update(self, dt):
         self.now += dt
         self.display.on_update(dt)
         self.display.update_ps(self.get_multiplier())
+        self.bonus = (self.bonus or (self.next_bar % 6) == 4)
+        if self.next_bar < len(self.bar_data)-1 and self.bar_data[self.next_bar] <= self.gem_data[self.next_gem][0]:
+            self.next_bar += 1
+            if self.bonus:
+                self.__use_bonus()
+
 
     def get_score(self):
         return self.score

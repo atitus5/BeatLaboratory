@@ -688,13 +688,18 @@ class BeatMatchDisplay(InstructionGroup):
             gem.on_miss()
 
     def __find_gem(self, gem_idx):
-        # this logic assumes gem hit will never be given more than +/- 1 bar early/late
-        if 0 <= (gem_idx - self.gem_offset) < self.bar_num_gems[self.current_bar]:
-            return self.bars[self.current_bar], gem_idx - self.gem_offset
-        elif (gem_idx - self.gem_offset) < 0:
+        # this logic assumes gem hit will never be given more than 1 bar late
+        # late
+        if (gem_idx - self.gem_offset) < 0:
             return self.bars[self.current_bar-1], gem_idx - (self.gem_offset - self.bar_num_gems[self.current_bar-1])
-        else:
-            return self.bars[self.current_bar+1], gem_idx - (self.gem_offset + self.bar_num_gems[self.current_bar])
+
+        # current or future measure
+        i = gem_idx - self.gem_offset
+        j = 0
+        while i >= self.bar_num_gems[self.current_bar+j]:
+            i -= self.bar_num_gems[self.current_bar+j]
+            j += 1
+        return self.bars[self.current_bar+j], i
 
     def update_ps(self, multiplier):
         self.hpd.update_ps(multiplier)
