@@ -108,8 +108,6 @@ class GameWidget(Widget):
         self.now += dt
 
         self.player.on_update(dt)
-        if self.train:
-            self.player.streak = 0
         if not self.train:
             self.score_label.text = 'score: ' + str(self.player.get_score())
             self.multiplier_streak_label.text = 'x' + str(self.player.get_multiplier()) + ' (' + str(self.player.get_streak()) + ' in a row)'
@@ -210,7 +208,11 @@ class Player(object):
 
     # called by MainWidget
     def on_event(self, lane):
-        if self.next_gem < len(self.gem_data):
+        # if we are in a bar that was cleared by bonus
+        if self.next_bar > 0 and self.now < self.bar_data[self.next_bar-1]:
+            if lane < 254: # not silence
+                self.streak += 1
+        elif self.next_gem < len(self.gem_data):
             # check for hit
             if self.gem_data[self.next_gem][1] == lane:
                 self.display.gem_hit(self.next_gem)
@@ -222,6 +224,7 @@ class Player(object):
             if self.next_gem < len(self.gem_data)-1:
                 self.next_gem += 1
 
+    # clears the next n bars
     def __use_bonus(self):
         self.next_bar = min(len(self.bar_data)-1, self.next_bar+1)
         while self.next_gem < len(self.gem_data)-1 and self.gem_data[self.next_gem][0] < self.bar_data[self.next_bar]:
@@ -235,12 +238,12 @@ class Player(object):
         self.now += dt
         self.display.on_update(dt)
         self.display.update_ps(self.get_multiplier())
-        self.bonus = (self.bonus or (self.next_bar % 6) == 4)
+        condition = self.streak > 0 and (self.streak % 25) == 0
+        self.bonus = (self.bonus or condition)
         if self.next_bar < len(self.bar_data)-1 and self.bar_data[self.next_bar] <= self.gem_data[self.next_gem][0]:
             self.next_bar += 1
             if self.bonus:
                 self.__use_bonus()
-
 
     def get_score(self):
         return self.score
