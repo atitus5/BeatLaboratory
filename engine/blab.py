@@ -26,7 +26,6 @@ kSongs = (
     {'title' : '24k Magic',
     'artist' : 'Bruno Mars',
     'path': '../data/24KMagicNoDrums'},
-
     {'title' : 'Beat It',
     'artist' : 'Michael Jackson',
     'path' : '../data/BeatItNoDrums'}
