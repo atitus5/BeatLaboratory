@@ -92,6 +92,9 @@ class GameWidget(Widget):
                 if event is not kNoEvent:
                     self.player.on_event(event)
 
+    def get_score(self):
+    	return self.player.get_score()
+
     def on_update(self) :
         if self.bg.paused:
             # Run our own clock
@@ -109,8 +112,8 @@ class GameWidget(Widget):
             self.score_label.text = 'score: ' + str(self.player.get_score())
             self.multiplier_streak_label.text = 'x' + str(self.player.get_multiplier()) + ' (' + str(self.player.get_streak()) + ' in a row)'
 
-        # done training
-        if self.player.next_gem >= len(self.player.gem_data):
+        # end of song
+        if self.now >= self.song_data.barlines[-1]:
             if self.train:
                 self.mic_handler.train_classifier()
             return False

@@ -5,6 +5,7 @@ from common.core import *
 from graphics import *
 from kivy.uix.button import Button
 
+# displays the game title
 class IntroWidget(Widget):
 	def __init__(self):
 		super(IntroWidget, self).__init__()
@@ -27,6 +28,7 @@ class IntroWidget(Widget):
 	def on_update(self):
 		return self.live
 
+
 # displays songs and lets user choose one
 class SongSelectWidget(Widget):
 	def __init__(self, options):
@@ -46,6 +48,9 @@ class SongSelectWidget(Widget):
 
 	def on_touch_down(self, touch):
 		self.menu.on_touch_down(touch)
+
+	def reset(self):
+		self.menu.reset()
 
 	def on_update(self):
 		return self.menu.on_update()
@@ -79,5 +84,51 @@ class MenuWidget(Widget):
 		if self.pos[0] <= touch.pos[0] < self.pos[0] + self.size[0] and self.pos[1] <= touch.pos[1] < self.pos[1] + self.size[1]:
 			self.chosen = int(touch.pos[1] / (self.size[1]/self.num_options))
 
+	def reset(self):
+		self.chosen = None
+
 	def on_update(self):
 		return self.chosen
+
+
+# displays the player's score
+class ScoreWidget(Widget):
+	def __init__(self, title, artist, score):
+		super(ScoreWidget, self).__init__()
+		self.add_widget(Label(text='"'+title+'" by '+artist,
+	        color=kTitleColor,
+	        halign='center',
+	        size=(kWindowWidth, kWindowHeight),
+	        text_size=(kWindowWidth, kWindowHeight),
+	        padding=(0,7*kWindowHeight/8),
+	        font_size= 0.5*kTopY,
+	        font_name=kFontPath
+	        )
+		)
+		self.add_widget(Label(text="Your score is "+str(score)+".",
+	        color=kTitleColor,
+	        halign='center',
+	        size=(kWindowWidth, kWindowHeight),
+	        text_size=(kWindowWidth, kWindowHeight),
+	        padding=(0,3*kWindowHeight/4),
+	        font_size= 0.5*kTopY,
+	        font_name=kFontPath
+	        )
+		)
+		self.add_widget(Label(text="Click anywhere to continue.",
+	        color=kTitleColor,
+	        halign='center',
+	        size=(kWindowWidth, kWindowHeight),
+	        text_size=(kWindowWidth, kWindowHeight),
+	        padding=(0,kWindowHeight/2),
+	        font_size= 0.5*kTopY,
+	        font_name=kFontPath
+	        )
+		)
+		self.live = True
+
+	def on_touch_down(self, touch):
+		self.live = False
+
+	def on_update(self):
+		return self.live

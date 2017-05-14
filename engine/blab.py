@@ -51,15 +51,16 @@ class MainWidget(BaseWidget):
         super(MainWidget, self).__init__()
         self.state = 'limbo'
         self.trained = False
+        self.chosen = None # index of selected song
 
         self.training_widget = GameWidget(train_song_path, train=True)
-        self.game_widget = None # gets populated whenever a song is chosen
         self.intro_widget = IntroWidget()
         self.select_widget = SongSelectWidget(map(lambda s: s['title'], kSongs))
+        self.game_widget = None # gets populated whenever a song is chosen
+        self.score_widget = None # gets populated after song
 
         self.add_widget(self.intro_widget)
         self.state = 'intro'
-        print 'hi'
 
     def on_key_down(self, keycode, modifiers):
         if self.state == 'training':
@@ -74,6 +75,7 @@ class MainWidget(BaseWidget):
         self.state = 'training'
 
     def __sc_game(self, instance=None):
+        self.trained = True
         self.remove_widget(self.training_widget)
         self.add_widget(self.game_widget)
         self.game_widget.on_key_down((None, 'p'), [])
@@ -85,6 +87,9 @@ class MainWidget(BaseWidget):
 
         elif self.state == 'select':
             self.select_widget.on_touch_down(touch)
+
+        elif self.state == 'score':
+            self.score_widget.on_touch_down(touch)
 
     def on_update(self):
         if self.state == 'limbo':
@@ -99,6 +104,7 @@ class MainWidget(BaseWidget):
         elif self.state == 'select':
             i = self.select_widget.on_update()
             if i != None:
+                self.chosen = i
                 self.game_widget = GameWidget(kSongs[i]['path'], seek=kSeek)
                 self.remove_widget(self.select_widget)
                 if not self.trained:
@@ -111,6 +117,7 @@ class MainWidget(BaseWidget):
                     popup.open()
                 else:
                     self.add_widget(self.game_widget)
+                    self.game_widget.on_key_down((None, 'p'), [])
                     self.state = 'game'
 
         elif self.state == 'training':
@@ -123,8 +130,22 @@ class MainWidget(BaseWidget):
                 popup.bind(on_dismiss=self.__sc_game)
                 popup.open()
 
-        elif self.game_widget:
-            cont = self.game_widget.on_update()
+        elif self.state == 'game':
+            if not self.game_widget.on_update():
+                self.state = 'score'
+                self.remove_widget(self.game_widget)
+                title = kSongs[self.chosen]['title']
+                artist = kSongs[self.chosen]['artist']
+                score = self.game_widget.get_score()
+                self.score_widget = ScoreWidget(title, artist, score)
+                self.add_widget(self.score_widget)
+
+        elif self.state == 'score':
+            if not self.score_widget.on_update():
+                self.state = 'select'
+                self.remove_widget(self.score_widget)
+                self.select_widget.reset()
+                self.add_widget(self.select_widget)
 
         else:
             print "Fatal error: Invalid state!"
