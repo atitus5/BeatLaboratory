@@ -8,8 +8,7 @@ kBottomY = 40 # bottom padding
 kTopY = 60 # top padding
 
 # graphics only
-# kGemWidth = 150
-kGemWidth = 75
+kGemWidth = 150
 kGemHeight = kGemWidth
 kBoxThickness = 5
 kMeasureSpacing = 20 # vertical space between measures
@@ -99,7 +98,6 @@ from common.gfxutil import *
 # LABEL FUNCTIONS
 def title_label() :
     l = Label(text="Beat Laboratory",
-        # color=(0,0,0,1),
         color=kTitleColor,
         halign='center',
         size=(kWindowWidth, kWindowHeight),
@@ -111,7 +109,6 @@ def title_label() :
     return l
 def topleft_label() :
     l = Label(text="text",
-        #color=(0,0,0,1),
         color=kTextColor,
         size=(kWindowWidth, kWindowHeight),
         text_size=(kWindowWidth, kWindowHeight),
@@ -122,7 +119,6 @@ def topleft_label() :
     return l
 def topright_label() :
     l = Label(text="text",
-        #color=(0,0,0,1),
         color=kTextColor,
         halign='right',
         size=(kWindowWidth, kWindowHeight),
@@ -134,18 +130,12 @@ def topright_label() :
     return l
 
 
-# MENUS AND POPUPS
-# TODO
-
-
 #KIVY INSTRUCTION GROUPS
 # displays a circle with a color depending on beat type
 class GemDisplay(InstructionGroup):
     def __init__(self, pos, size, beat):
         super(GemDisplay, self).__init__()
-        #self.color = Color(1,1,1,mode='rgb')
         self.color = Color(kTextColor[0], kTextColor[1], kTextColor[2], kTextColor[3], mode='rgba')
-        #self.gem = Ellipse(pos=pos, size=size)
 
         self.gem = None
         if beat < len(kImages):
@@ -207,8 +197,6 @@ class GemDisplay(InstructionGroup):
         # self.color.rgba = (1,1,1,0) # invisible
         self.hit_time = 0
         self.hit_animating = True
-
-
 
     # update position and size of gem if it is animating
     def on_update(self, dt):
@@ -744,6 +732,7 @@ class BeatMatchDisplay(InstructionGroup):
 
         self.hpd.on_update(dt)
         self.main_box_display.on_update(dt)
+
 
 # HELPER FUNCTIONS
 # returns a linear function f(x) given two points (x0, y0) and (x1, y1)
