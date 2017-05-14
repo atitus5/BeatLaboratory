@@ -41,9 +41,9 @@ kSnapFrac = kNumGems**-1 # if snap is true, tells to snap to nearest fraction of
 snapGems = True # snap gems to fraction of a barline.
 
 # audio
-#song_path = '../data/BeatItNoDrums' # could make command argument in future
-#song_path = '../data/24KMagicNoDrums' # could make command argument in future
-song_path = '../data/funk' # could make command argument in future
+# song_path = '../data/BeatItNoDrums' # could make command argument in future
+song_path = '../data/24KMagicNoDrums' # could make command argument in future
+# song_path = '../data/funk' # could make command argument in future
 train_song_path = '../data/training' # could make command argument in future
 
 
