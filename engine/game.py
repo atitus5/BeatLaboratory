@@ -221,6 +221,7 @@ class Player(object):
                 self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
             else:
                 self.display.gem_miss(self.next_gem)
+                self.bonus = False # no bonus if you miss before end of bar
                 self.streak = 0
             if self.next_gem < len(self.gem_data)-1:
                 self.next_gem += 1
