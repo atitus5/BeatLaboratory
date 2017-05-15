@@ -9,13 +9,22 @@ from kivy.uix.button import Button
 class IntroWidget(Widget):
 	def __init__(self):
 		super(IntroWidget, self).__init__()
-		self.add_widget(title_label())
+		self.add_widget(Label(text="Beat Laboratory",
+	        color=kTitleColor,
+	        halign='center',
+	        size=(kWindowWidth, kWindowHeight),
+	        text_size=(kWindowWidth, kWindowHeight),
+	        padding=(0,3*kWindowHeight/8),
+	        font_size= 0.25*kWindowHeight,
+	        font_name=kFontPath
+	        )
+		)
 		self.add_widget(Label(text="Click anywhere to continue.",
 	        color=kTitleColor,
 	        halign='center',
 	        size=(kWindowWidth, kWindowHeight),
 	        text_size=(kWindowWidth, kWindowHeight),
-	        padding=(0,kWindowHeight/2),
+	        padding=(0,kWindowHeight/8),
 	        font_size= 0.5*kTopY,
 	        font_name=kFontPath
 	        )
@@ -31,29 +40,46 @@ class IntroWidget(Widget):
 
 # displays songs and lets user choose one
 class SongSelectWidget(Widget):
-	def __init__(self, options):
+	def __init__(self, songs):
 		super(SongSelectWidget, self).__init__()
+		self.num_options = len(songs)
+		buttonW = kWindowWidth/self.num_options
+		buttonH = kWindowHeight - (kTopY + kTitleFontSize) / 2
 		self.add_widget(Label(text="Choose A Song",
 			color=kTitleColor,
 	        halign='center',
 	        size=(kWindowWidth, kWindowHeight),
 	        text_size=(kWindowWidth, kWindowHeight),
-	        padding=(0,kWindowHeight - (kTopY + kTitleFontSize) / 2),
+	        padding=(0, buttonH),
 	        font_size= 0.9*kTopY,
 	        font_name=kFontPath
 	        )
 		)
-		self.menu = MenuWidget(options, (0,0), (kWindowWidth, kWindowHeight))
-		self.add_widget(self.menu)
+		for i in range(len(songs)):
+			button = Button(text=songs[i]['title'],
+				color=kTitleColor,
+				# background_normal='',
+				# background_color=kBgColor,
+				halign='center',
+				size=(buttonW, buttonH),
+				text_size=(buttonW, buttonH),
+				pos=(i*buttonW, 0),
+				padding=(0, .4*buttonH),
+				font_size=.2*buttonH,
+				font_name=kFontPath
+				)
+			self.add_widget(button)
+		self.chosen = None
 
 	def on_touch_down(self, touch):
-		self.menu.on_touch_down(touch)
+		if 0 <= touch.pos[0] < kWindowWidth and 0 <= touch.pos[1] < kWindowHeight-- (kTopY + kTitleFontSize) / 2:
+			self.chosen = int(touch.pos[0] / (kWindowWidth/self.num_options))
 
 	def reset(self):
-		self.menu.reset()
+		self.chosen = None
 
 	def on_update(self):
-		return self.menu.on_update()
+		return self.chosen
 
 
 # simple menu class
@@ -70,11 +96,13 @@ class MenuWidget(Widget):
 		for i in range(self.num_options):
 			button = Button(text=options[i],
 				color=kTitleColor,
+				background_normal='',
+				background_color=kBgColor,
 				halign='center',
 				size=(size[0], buttonY),
 				text_size=(size[0], buttonY),
 				pos=(0, i*buttonY),
-				padding=(0,0),
+				padding=(0, buttonY/2),
 				font_size=.9*buttonY,
 				font_name=kFontPath
 				)

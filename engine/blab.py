@@ -6,12 +6,14 @@ sys.path.append('..')
 
 # command line args
 kSeek = 0.0
+kRecord = False
+kUseDefaultModel = False
 if len(sys.argv) >= 2:
     kSeek = float(sys.argv[1])
 kRecord = False
 if len(sys.argv) >= 3:
-    kUseMic = not sys.argv[2] == 'nomic'
     kRecord = sys.argv[2] == 'record'
+    kUseDefaultModel = sys.argv[2] == 'usedefault'
 
 # other game files
 from graphics import *
@@ -23,7 +25,7 @@ from common.core import *
 
 # CONSTANTS
 kSongs = (
-    {'title' : '24k Magic',
+    {'title' : '24K Magic',
     'artist' : 'Bruno Mars',
     'path': '../data/24KMagicNoDrums'},
     {'title' : 'Beat It',
@@ -50,12 +52,12 @@ class MainWidget(BaseWidget):
     def __init__(self):
         super(MainWidget, self).__init__()
         self.state = 'limbo'
-        self.trained = False
+        self.trained = kUseDefaultModel
         self.chosen = None # index of selected song
 
         self.training_widget = GameWidget(train_song_path, train=True)
         self.intro_widget = IntroWidget()
-        self.select_widget = SongSelectWidget(map(lambda s: s['title'], kSongs))
+        self.select_widget = SongSelectWidget(kSongs)
         self.game_widget = None # gets populated whenever a song is chosen
         self.score_widget = None # gets populated after song
 
