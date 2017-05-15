@@ -29,6 +29,7 @@ kBottomFontSize = 0.7 * kBottomY
 kReplaceMe = 100
 kAnimDur = .25 # number of seconds animations take
 kHitAnimDur = .5 # number of seconds hit animations take
+kExplodeAnimDur = 0.25 # number of seconds explosion animations take
 
 
 
@@ -41,6 +42,7 @@ kGemParticlePath = "../particle/gem_particle.pex"
 # kCornerParticlePath = "../particle/particle2.pex"
 kLCornerParticlePath = "../particle/fire_particle_l.pex"
 kRCornerParticlePath = "../particle/fire_particle_r.pex"
+kExplosionParticlePath = "../particle/explosion_particle.pex"
 
 # these are just convenient
 kMeasureWidth = kNumGems * kGemWidth
@@ -520,6 +522,13 @@ class HitParticleDisplay(InstructionGroup):
         self.br.emit_angle = 3*np.pi*4**-1
         self.b_hit_time = -1
 
+        # "explosion" particle system for when a streak happens
+        self.ex = ParticleSystem(kExplosionParticlePath)
+        self.ex.emitter_x = kWindowWidth / 2
+        self.ex.emitter_y = previewY(0) - ((previewY(0) - (previewY(1) + kMeasureHeight * kPreviews[0])) / 2.0)
+        self.ex.start_color = kFireColors[len(kFireColors) - 1]
+        self.ex_hit_time = -1
+
         self.installed = False
 
 
@@ -534,11 +543,17 @@ class HitParticleDisplay(InstructionGroup):
             self.br.start()
             self.b_hit_time = 0
 
+    def explode(self):
+        if self.installed:
+            self.ex.start()
+            self.ex_hit_time = 0
+
     def install_particle_systems(self, widget):
         for ps in self.m_psystems:
             widget.add_widget(ps)
         widget.add_widget(self.bl)
         widget.add_widget(self.br)
+        widget.add_widget(self.ex)
         self.installed = True
 
     def update_ps(self, multiplier):
@@ -562,6 +577,13 @@ class HitParticleDisplay(InstructionGroup):
             self.b_hit_time = -1
             self.bl.stop()
             self.br.stop()
+
+        if self.ex_hit_time >= 0:
+            self.ex_hit_time += dt
+        if self.ex_hit_time >= kExplodeAnimDur:
+            self.ex_hit_time = -1
+            self.ex.stop()
+            self.ex.stop()
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.
@@ -705,6 +727,9 @@ class BeatMatchDisplay(InstructionGroup):
 
     def install_particle_systems(self, widget):
         self.hpd.install_particle_systems(widget)
+
+    def explode(self):
+        self.hpd.explode()
 
     # call every frame to move nowbar and check if measures need updating
     def on_update(self, dt):
