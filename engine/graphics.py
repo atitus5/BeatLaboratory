@@ -228,13 +228,12 @@ class GemDisplay(InstructionGroup):
 
                 if self.gem != None:
                     self.gem.size = (r, r)
-                self.color.a = alpha
+                    self.color.a = alpha
 
-                size_diff = self.prev_anim_size - r
-                x = self.gem.pos[0] + .5*size_diff
-                y = self.gem.pos[1] + .5*size_diff
+                    size_diff = self.prev_anim_size - r
+                    x = self.gem.pos[0] + .5*size_diff
+                    y = self.gem.pos[1] + .5*size_diff
 
-                if self.gem != None:
                     self.gem.pos = np.array((x, y))
 
                 self.prev_anim_size = r

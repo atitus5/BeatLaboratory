@@ -208,11 +208,7 @@ class Player(object):
 
     # called by MainWidget
     def on_event(self, lane):
-        # if we are in a bar that was cleared by bonus
-        if self.next_bar > 0 and self.now < self.bar_data[self.next_bar-1]:
-            if lane < 254: # not silence
-                self.streak += 1
-        elif self.next_gem < len(self.gem_data):
+        if self.next_gem < len(self.gem_data):
             # check for hit
             if self.gem_data[self.next_gem][1] == lane:
                 self.display.gem_hit(self.next_gem)
