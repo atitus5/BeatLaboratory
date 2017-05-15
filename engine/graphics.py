@@ -34,8 +34,9 @@ kExplodeAnimDur = 0.25 # number of seconds explosion animations take
 kFreestyleImage = '../data/freestyle.png'
 kFreestyleAR = 5.0   # Aspect ratio of the image
 kGrowAnimDur = 0.125 # number of seconds "Freestyle!" takes to explode
-kFadeAnimDur = 0.625 # number of seconds "Freestyle!" takes to fade, once exploded
-kFreestyleDur = kGrowAnimDur + kFadeAnimDur
+kStayAnimDur = 1.5  # number of seconds "Freestyle!" retains its size
+kFadeAnimDur = 0.125 # number of seconds "Freestyle!" takes to fade, once exploded
+kFreestyleDur = kGrowAnimDur + kStayAnimDur + kFadeAnimDur
 
 
 
@@ -538,11 +539,11 @@ class HitParticleDisplay(InstructionGroup):
         self.ex_hit_time = -1
 
         # "Freestyle!" text
-        self.fs = Rectangle(pos=(explosion_x, explosion_y, size=(0,0), texture=Image(kFreestyleImage).texture)
-        self.add(self.fs)
+        self.fs = Rectangle(pos=(explosion_x, explosion_y), size=(0,0), texture=Image(kFreestyleImage).texture)
         self.fs_size_anim = KFAnim((0, 0, 0),
                                    (kGrowAnimDur, kMeasureHeight * kFreestyleAR, kMeasureHeight),
-                                   (kGrowAnimDur + kFadeAnimDur, 0, 0))
+                                   (kGrowAnimDur + kStayAnimDur, kMeasureHeight * kFreestyleAR, kMeasureHeight),
+                                   (kGrowAnimDur + kStayAnimDur + kFadeAnimDur, 0, 0))
         self.fs_hit_time = -1
 
         self.installed = False
@@ -571,6 +572,7 @@ class HitParticleDisplay(InstructionGroup):
         widget.add_widget(self.bl)
         widget.add_widget(self.br)
         widget.add_widget(self.ex)
+        self.add(self.fs)
         self.installed = True
 
     def update_ps(self, multiplier):
@@ -603,8 +605,11 @@ class HitParticleDisplay(InstructionGroup):
 
         if self.fs_hit_time >= 0:
             self.fs.size = self.fs_size_anim.eval(self.fs_hit_time)
+            self.fs.pos = (self.ex.emitter_x - (self.fs.size[0] / 2.0),
+                           self.ex.emitter_y - (self.fs.size[1] / 2.0))
             self.fs_hit_time += dt
-        if self.fs_hit_time >= kFreestyleDur
+        if self.fs_hit_time >= kFreestyleDur:
+            self.fs.size = (0, 0)
             self.fs_hit_time = -1
 
 
@@ -631,6 +636,7 @@ class BeatMatchDisplay(InstructionGroup):
         self.nbd = NowbarDisplay(kLeftX+kBoxThickness/2, kLeftX+kMeasureWidth+kBoxThickness/2, y, y+h)
         self.add(self.nbd)
         self.hpd = HitParticleDisplay((x+kBoxThickness,y+kBoxThickness), (w-kBoxThickness, h-kBoxThickness))
+        self.add(self.hpd)
 
         # tracks which measures are animating
         self.updates = []
