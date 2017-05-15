@@ -77,6 +77,11 @@ class GameWidget(Widget):
             if self.record:
                 self.writer.toggle()
 
+        '''
+        if keycode[1] == 'e':
+            self.player.display.explode()
+        '''
+
     def process_mic_input(self, data, num_channels):
         if self.mic_handler.processing_audio:
             # Send mic input to our handler
@@ -223,6 +228,7 @@ class Player(object):
     # clears the next n bars
     def __use_bonus(self):
         self.next_bar = min(len(self.bar_data)-1, self.next_bar+1)
+        self.display.explode()
         while self.next_gem < len(self.gem_data)-1 and self.gem_data[self.next_gem][0] < self.bar_data[self.next_bar]:
             self.display.gem_hit(self.next_gem)
             self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
