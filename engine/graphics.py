@@ -31,6 +31,12 @@ kAnimDur = .25 # number of seconds animations take
 kHitAnimDur = .5 # number of seconds hit animations take
 kExplodeAnimDur = 0.25 # number of seconds explosion animations take
 
+kFreestyleImage = '../data/freestyle.png'
+kFreestyleAR = 5.0   # Aspect ratio of the image
+kGrowAnimDur = 0.125 # number of seconds "Freestyle!" takes to explode
+kFadeAnimDur = 0.625 # number of seconds "Freestyle!" takes to fade, once exploded
+kFreestyleDur = kGrowAnimDur + kFadeAnimDur
+
 
 
 # graphics that indirectly affect gameplay
@@ -523,11 +529,21 @@ class HitParticleDisplay(InstructionGroup):
         self.b_hit_time = -1
 
         # "explosion" particle system for when a streak happens
+        explosion_x = kWindowWidth / 2
+        explosion_y = previewY(0) - ((previewY(0) - (previewY(1) + kMeasureHeight * kPreviews[0])) / 2.0)
         self.ex = ParticleSystem(kExplosionParticlePath)
-        self.ex.emitter_x = kWindowWidth / 2
-        self.ex.emitter_y = previewY(0) - ((previewY(0) - (previewY(1) + kMeasureHeight * kPreviews[0])) / 2.0)
+        self.ex.emitter_x = explosion_x
+        self.ex.emitter_y = explosion_y 
         self.ex.start_color = kFireColors[len(kFireColors) - 1]
         self.ex_hit_time = -1
+
+        # "Freestyle!" text
+        self.fs = Rectangle(pos=(explosion_x, explosion_y, size=(0,0), texture=Image(kFreestyleImage).texture)
+        self.add(self.fs)
+        self.fs_size_anim = KFAnim((0, 0, 0),
+                                   (kGrowAnimDur, kMeasureHeight * kFreestyleAR, kMeasureHeight),
+                                   (kGrowAnimDur + kFadeAnimDur, 0, 0))
+        self.fs_hit_time = -1
 
         self.installed = False
 
@@ -547,6 +563,7 @@ class HitParticleDisplay(InstructionGroup):
         if self.installed:
             self.ex.start()
             self.ex_hit_time = 0
+            self.fs_hit_time = 0
 
     def install_particle_systems(self, widget):
         for ps in self.m_psystems:
@@ -583,7 +600,12 @@ class HitParticleDisplay(InstructionGroup):
         if self.ex_hit_time >= kExplodeAnimDur:
             self.ex_hit_time = -1
             self.ex.stop()
-            self.ex.stop()
+
+        if self.fs_hit_time >= 0:
+            self.fs.size = self.fs_size_anim.eval(self.fs_hit_time)
+            self.fs_hit_time += dt
+        if self.fs_hit_time >= kFreestyleDur
+            self.fs_hit_time = -1
 
 
 # Displays and controls all game elements: Nowbar, Buttons, BarLines, Gems.

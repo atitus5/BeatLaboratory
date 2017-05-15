@@ -77,10 +77,8 @@ class GameWidget(Widget):
             if self.record:
                 self.writer.toggle()
 
-        '''
         if keycode[1] == 'e':
             self.player.display.explode()
-        '''
 
     def process_mic_input(self, data, num_channels):
         if self.mic_handler.processing_audio:
