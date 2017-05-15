@@ -27,10 +27,12 @@ from common.core import *
 kSongs = (
     {'title' : '24K Magic',
     'artist' : 'Bruno Mars',
-    'path': '../data/24KMagicNoDrums'},
+    'path' : '../data/24KMagicNoDrums',
+    'image': '../data/24K_Magic.png'},
     {'title' : 'Beat It',
     'artist' : 'Michael Jackson',
-    'path' : '../data/BeatItNoDrums'}
+    'path' : '../data/BeatItNoDrums',
+    'image' : '../data/Thriller.png'}
     )
 
 train_song_path = '../data/training'
@@ -104,6 +106,7 @@ class MainWidget(BaseWidget):
                 self.state = 'select'
 
         elif self.state == 'select':
+            self.select_widget.set_mouse_pos(Window.mouse_pos)
             i = self.select_widget.on_update()
             if i != None:
                 self.chosen = i
