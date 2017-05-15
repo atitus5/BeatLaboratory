@@ -199,6 +199,7 @@ class Player(object):
         self.streak = 0
         self.display.update_ps(self.get_multiplier())
         self.bonus = False
+        self.cleared = False # makes sure you only get one bonus per 25 streak
 
         # skip ahead in case of seeks
         while self.next_gem < len(self.gem_data)-1 and self.gem_data[self.next_gem][0] < self.now - kSlopWindow:
@@ -213,6 +214,8 @@ class Player(object):
             if self.gem_data[self.next_gem][1] == lane:
                 self.display.gem_hit(self.next_gem)
                 self.streak += 1
+                if self.cleared:
+                    self.cleared = False
                 self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
             else:
                 self.display.gem_miss(self.next_gem)
@@ -229,13 +232,14 @@ class Player(object):
             self.score += 1 * min(kMaxMultiplier, 1 + self.streak/5)
             self.next_gem += 1
         self.bonus = False
+        self.cleared = True
 
     # needed to check if for pass gems (ie, went past the slop window)
     def on_update(self, dt):
         self.now += dt
         self.display.on_update(dt)
         self.display.update_ps(self.get_multiplier())
-        condition = self.streak > 0 and (self.streak % 25) == 0
+        condition = self.streak > 0 and (self.streak % 25) == 0 and not self.cleared
         self.bonus = (self.bonus or condition)
         if self.next_bar < len(self.bar_data)-1 and self.bar_data[self.next_bar] <= self.gem_data[self.next_gem][0]:
             self.next_bar += 1
