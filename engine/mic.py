@@ -73,7 +73,7 @@ class MicrophoneHandler(object) :
         labels = np.asarray(labels)
 
         self.classifier.fit(features, labels)
-        self.training_data = None
+        self.training_data = []
 
         end_t = time.time()
         elapsed_t = end_t - start_t
