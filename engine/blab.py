@@ -48,8 +48,8 @@ Simply press anywhere outside of this box to begin.'''
 kPopupTitle2 = "You're ready to go!"
 kPopupMessage2 = '''You're all ready to play!
 
-Press 'p' to pause/unpause the game.
-Simply press anywhere outside of this box to begin.'''
+Press anywhere outside of this box to begin.
+Press 'p' to pause/unpause the game.'''
 
 # MAIN WIDGET
 class MainWidget(BaseWidget):
